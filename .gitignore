@@ -3,3 +3,4 @@ test-apps
 .tmp
 .cache
 compile_commands.json
+env
