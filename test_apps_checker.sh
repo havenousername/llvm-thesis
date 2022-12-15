@@ -32,13 +32,31 @@ fi
 
 
 # Not enough arguments provided
-if [[ $# -lt 1 || $# -gt 2 ]]
+if [[ $# -lt 1 || $# -gt 5 ]]
 then 
-    echo "[warn] Usage of script '$0 <folder with c/c++ test files>'"
+    echo "[warn] Usage of script '$0 <folder with c/c++ test files> <checks(optional?)> <max_file_count(optional)> <has_profile(optional)>'"
     exit 1
 fi
 
 dst=$1
+max_file_count=10000
+has_profile=1
+checks=cert-assignment-in-selection
+
+if [[ $# -ge 2 ]]
+then
+    checks=$2
+fi 
+
+if [[ $# -ge 3 ]]
+then 
+    max_file_count=$3
+fi
+
+if [[ $# -eq 4 ]]
+then 
+    has_profile=$4
+fi
 
 
 first_write=0
@@ -104,28 +122,33 @@ do
     cfiles=`find ${WHERE_AM_I}/${file} -type f -name "*.c"`  
     
     for cfile in $(echo $cfiles | tr " " "\n")
-    do 
-        sleep 0.1
+    do
+        if [[ max_file_count -eq 0 ]]
+        then 
+            exit 0
+        fi
+        max_file_count=$max_file_count-1
+
+        sleep 0.0001
         echo "[info] Starting clang script on file ${cfile}"
-        if [ first_write -eq 0 ];
+
+        if [[ first_write -eq 0 ]]
         then 
             rm -rf .tmp/profile
         fi 
-        result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=.tmp/profile  --quiet -checks=-*,cert-assignments-in-selection)
         mkdir -p .tmp 
+        result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=.tmp/profile  --quiet -checks=-*,${checks})
         touch .tmp/out.txt
-        if [[ "$result" == *"[cert-assignments-in-selection]"* ]]; 
+        if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-assignments-in-selection]"* ]]; 
         then 
-            if [ -s .tmp/out.txt ] && [ first_write -eq 0 ];
+            if [ -s .tmp/out.txt ] && [[ first_write -eq 0 ]]
             then
                 echo "${result}" > .tmp/out.txt
                 first_write=1
             else     
                 echo "${result}" >> .tmp/out.txt
             fi 
-            
         fi
     done 
-    sleep 1
     echo "[info] Finishing clang script on file ${cfile}"
 done
