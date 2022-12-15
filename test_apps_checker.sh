@@ -41,7 +41,7 @@ fi
 dst=$1
 max_file_count=10000
 has_profile=1
-checks=cert-assignment-in-selection
+checks=cert-assignments-in-selection
 
 if [[ $# -ge 2 ]]
 then
@@ -62,7 +62,7 @@ fi
 first_write=0
 array=()
 WHERE_AM_I=$(pwd)
-OUTPUT_DIR=`${WHERE_AM_I}/assignment-checker-out`
+# OUTPUT_DIR=`${WHERE_AM_I}/assignment-checker-out`
 # get directories which are in the current dir and specified by the user
 get_current_directories() {
     i=0
@@ -119,7 +119,20 @@ get_current_directories
 for file in ${array[@]};
 do
     echo "[info] Starting executing folder './${file}'"
-    cfiles=`find ${WHERE_AM_I}/${file} -type f -name "*.c"`  
+    
+    # cfiles=$(find ${WHERE_AM_I}/${file} -type f \
+    #     -name "*.c" -o \
+    #     -name "*.cpp" -o \    
+    #     -name "*.cc" -o \ 
+    #     -name "*.h"  -o \ 
+    #     -name "*.C" -o \ 
+    #     -name "*.cxx" -o \  
+    #     -name "*.c++" \ 
+    #     -o -name "*.hh" \    
+    #     -o -name "*.hxx" \
+    #     -o -name "*.hpp" 
+    #     -o -name ".h++")
+    cfiles=`find ${WHERE_AM_I}/${file} -type f -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h"  -o -name "*.C" -o -name "*.cxx" -o -name "*.c++" -o -name "*.hh" -o -name "*.hxx" -o -name "*.hpp" -o -name ".h++"`
     
     for cfile in $(echo $cfiles | tr " " "\n")
     do
