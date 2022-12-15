@@ -34,28 +34,28 @@ fi
 # Not enough arguments provided
 if [[ $# -lt 1 || $# -gt 5 ]]
 then 
-    echo "[warn] Usage of script '$0 <folder with c/c++ test files> <checks(optional?)> <max_file_count(optional)> <has_profile(optional)>'"
+    echo "[warn] Usage of script '$0 <folder with c/c++ test files> <has_profile(optional)> <checks(optional?)> <max_file_count(optional)>'"
     exit 1
 fi
 
 dst=$1
 max_file_count=10000
-has_profile=1
+has_profile=0
 checks=cert-assignments-in-selection
 
-if [[ $# -ge 2 ]]
+if [[ $# -ge 3 ]]
 then
-    checks=$2
+    checks=$3
 fi 
 
-if [[ $# -ge 3 ]]
+if [[ $# -ge 4 ]]
 then 
-    max_file_count=$3
+    max_file_count=$4
 fi
 
-if [[ $# -eq 4 ]]
+if [[ $# -eq 2 ]]
 then 
-    has_profile=$4
+    has_profile=$2
 fi
 
 
@@ -64,18 +64,6 @@ array=()
 WHERE_AM_I=$(pwd)
 # OUTPUT_DIR=`${WHERE_AM_I}/assignment-checker-out`
 # get directories which are in the current dir and specified by the user
-get_current_directories() {
-    i=0
-    for file in *; 
-    do
-        if [[ -d "$file" ]] && [[ "$file" == "$dst" ]]
-        then 
-            array[i]=$file
-            i=$i+1
-            sleep 0.4
-        fi
-    done   
-}
 
 # Different error prone tests
 check_build_dir() {
@@ -113,27 +101,11 @@ check_build_dir() {
 }
 
 check_build_dir
-get_current_directories
+cd $dst
+WHERE_AM_I_NOW=$(pwd)
 
-# Main program
-for file in ${array[@]};
-do
-    echo "[info] Starting executing folder './${file}'"
-    
-    # cfiles=$(find ${WHERE_AM_I}/${file} -type f \
-    #     -name "*.c" -o \
-    #     -name "*.cpp" -o \    
-    #     -name "*.cc" -o \ 
-    #     -name "*.h"  -o \ 
-    #     -name "*.C" -o \ 
-    #     -name "*.cxx" -o \  
-    #     -name "*.c++" \ 
-    #     -o -name "*.hh" \    
-    #     -o -name "*.hxx" \
-    #     -o -name "*.hpp" 
-    #     -o -name ".h++")
-    cfiles=`find ${WHERE_AM_I}/${file} -type f -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h"  -o -name "*.C" -o -name "*.cxx" -o -name "*.c++" -o -name "*.hh" -o -name "*.hxx" -o -name "*.hpp" -o -name ".h++"`
-    
+handle_files() {
+    cfiles=("$@")
     for cfile in $(echo $cfiles | tr " " "\n")
     do
         if [[ max_file_count -eq 0 ]]
@@ -142,26 +114,37 @@ do
         fi
         max_file_count=$max_file_count-1
 
-        sleep 0.0001
-        echo "[info] Starting clang script on file ${cfile}"
+        # sleep 0.0001
+        echo "[info] Starting clang script on file ${WHERE_AM_I_NOW}/${cfile}"
 
         if [[ first_write -eq 0 ]]
         then 
             rm -rf .tmp/profile
         fi 
         mkdir -p .tmp 
-        result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=.tmp/profile  --quiet -checks=-*,${checks})
-        touch .tmp/out.txt
+        echo $checks
+        result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=${WHERE_AM_I}/.tmp/profile  --quiet -checks=-*,${checks})
+        touch "${WHERE_AM_I}/.tmp/out.txt"
+        chmod 777 "${WHERE_AM_I}/.tmp/out.txt"
         if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-assignments-in-selection]"* ]]; 
         then 
-            if [ -s .tmp/out.txt ] && [[ first_write -eq 0 ]]
+            if [[ "$result" == *"[clang-diagnostic-error]"* ]] || [[ -z "$result" ]] 
             then
-                echo "${result}" > .tmp/out.txt
+                continue  
+            fi 
+            if [ -s $(${WHERE_AM_I}/.tmp/out.txt) ] && [[ first_write -eq 0 ]]
+            then
+                echo "${result}" > "${WHERE_AM_I}/.tmp/out.txt"
                 first_write=1
             else     
-                echo "${result}" >> .tmp/out.txt
+                echo "${result}" >> "${WHERE_AM_I}/.tmp/out.txt"
             fi 
         fi
     done 
-    echo "[info] Finishing clang script on file ${cfile}"
-done
+}
+
+# Main program
+files_curr=`find ${WHERE_AM_I_NOW} -type f -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h"  -o -name "*.C" -o -name "*.cxx" -o -name "*.c++" -o -name "*.hh" -o -name "*.hxx" -o -name "*.hpp" -o -name ".h++"`
+handle_files "${files_curr[@]}"
+
+cd $WHERE_AM_I
