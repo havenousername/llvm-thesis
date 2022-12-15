@@ -41,7 +41,7 @@ fi
 dst=$1
 max_file_count=10000
 has_profile=0
-checks=cert-assignments-in-selection
+checks=cert-exp45-c
 
 if [[ $# -ge 3 ]]
 then
@@ -104,6 +104,8 @@ check_build_dir
 cd $dst
 WHERE_AM_I_NOW=$(pwd)
 
+directory=$(echo "$dst" | cut -d "/" -f2)
+
 handle_files() {
     cfiles=("$@")
     for cfile in $(echo $cfiles | tr " " "\n")
@@ -124,20 +126,20 @@ handle_files() {
         mkdir -p .tmp 
         echo $checks
         result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=${WHERE_AM_I}/.tmp/profile  --quiet -checks=-*,${checks})
-        touch "${WHERE_AM_I}/.tmp/out.txt"
-        chmod 777 "${WHERE_AM_I}/.tmp/out.txt"
-        if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-assignments-in-selection]"* ]]; 
+        touch "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+        chmod 777 "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+        if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-exp45-c]"* ]]; 
         then 
-            if [[ "$result" == *"[clang-diagnostic-error]"* ]] || [[ -z "$result" ]] 
+            # if [[ "$result" == *"[clang-diagnostic-error]"* ]] || [[ -z "$result" ]] 
+            # then
+            #     continue  
+            # fi 
+            if [ -s $(${WHERE_AM_I}/.tmp/out-${directory}.txt) ] && [[ first_write -eq 0 ]]
             then
-                continue  
-            fi 
-            if [ -s $(${WHERE_AM_I}/.tmp/out.txt) ] && [[ first_write -eq 0 ]]
-            then
-                echo "${result}" > "${WHERE_AM_I}/.tmp/out.txt"
+                echo "${result}" > "${WHERE_AM_I}/.tmp/out-${directory}.txt"
                 first_write=1
             else     
-                echo "${result}" >> "${WHERE_AM_I}/.tmp/out.txt"
+                echo "${result}" >> "${WHERE_AM_I}/.tmp/out-${directory}.txt"
             fi 
         fi
     done 
