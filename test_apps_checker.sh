@@ -48,12 +48,12 @@ then
     checks=$3
 fi 
 
-if [[ $# -ge 4 ]]
+if [[ $# -eq 4 ]]
 then 
     max_file_count=$4
 fi
 
-if [[ $# -eq 2 ]]
+if [[ $# -ge 2 ]]
 then 
     has_profile=$2
 fi
@@ -104,7 +104,7 @@ check_build_dir
 cd $dst
 WHERE_AM_I_NOW=$(pwd)
 
-directory=$(echo "$dst" | cut -d "/" -f2)
+directory=$(basename "$dst")
 
 handle_files() {
     cfiles=("$@")
@@ -117,15 +117,19 @@ handle_files() {
         max_file_count=$max_file_count-1
 
         # sleep 0.0001
-        echo "[info] Starting clang script on file ${WHERE_AM_I_NOW}/${cfile}"
+        # echo "[info] Starting clang script on file ${WHERE_AM_I_NOW}/${cfile}"
 
         if [[ first_write -eq 0 ]]
         then 
             rm -rf .tmp/profile
         fi 
         mkdir -p .tmp 
-        echo $checks
-        result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=${WHERE_AM_I}/.tmp/profile  --quiet -checks=-*,${checks})
+        if [[ has_profile -eq 1 ]]
+        then
+            result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=${WHERE_AM_I}/.tmp/profile -checks=-"*,${checks}" --) 
+        else 
+            result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} -checks=-"*,${checks}" --) 
+        fi 
         touch "${WHERE_AM_I}/.tmp/out-${directory}.txt"
         chmod 777 "${WHERE_AM_I}/.tmp/out-${directory}.txt"
         if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-exp45-c]"* ]]; 
@@ -133,7 +137,7 @@ handle_files() {
             # if [[ "$result" == *"[clang-diagnostic-error]"* ]] || [[ -z "$result" ]] 
             # then
             #     continue  
-            # fi 
+            # fi
             if [ -s $(${WHERE_AM_I}/.tmp/out-${directory}.txt) ] && [[ first_write -eq 0 ]]
             then
                 echo "${result}" > "${WHERE_AM_I}/.tmp/out-${directory}.txt"
