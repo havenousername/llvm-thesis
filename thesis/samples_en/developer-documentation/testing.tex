@@ -1,0 +1,998 @@
+\section{CERT EXP45-C Testing}
+
+\subsection{Top-down, bottom-up lit testing}
+
+\subsubsection{Testing}
+
+When the header and implementation files are created by the \lstinline{add_new_checker.py}, one more file is created alongside it which is the part of testing environment of the LLVM architecture. The idea is simple, a checker is created, and the test code parts of this checker are created. Test code parts should either trigger checker to throw a warning, or not to trigger it. If it is required by the code snippet to trigger the checker, a special comment has to be provided, in order for LLVM to analyze the output of the warning text file. This approach of testing is provided by lit library integrated into LLVM for making simple black-box testing. Every lit clang-tidy test file should contain the following command at the beginning:
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+// RUN: %check_clang_tidy %s cert-exp45-c %t
+\end{minted}
+\caption{First line of lit file}
+\end{listing}
+
+\subsubsection{Lit annotations}
+
+Here is an example of lit test case:
+\begin{listing}[H]
+\begin{minted}{cpp}
+    // triggers check 
+    if (A = B) {
+    // CHECK-MESSAGES: :[[@LINE-1]]:11: warning: assignment is not allowed inside if statement [cert-exp45-c]
+
+    // do something 
+    }
+\end{minted}
+\caption{Lit simple test case}
+\end{listing}
+
+Here, the \lstinline{CHECK-MESSAGES} informs lit that the message warning should be checked, and the \lstinline{:[[@LINE-1]]:11:} corresponds to which line and column it should be done; Where \lstinline{-1} means \lstinline{currentline - 1}. After that, the message type is specified, and the message itself is. To run these tests it is enough to recompile clang-tools, with the command \lstinline{ninja check-clang-tools}. 
+
+Lit test cases are perfect as a refining tool for your checker. They can show the edge case scenarios, which are expected to have a positive test result but given a negative. It also helps with the checking of warning message compliance. Whenever there will be a difference between lit expectations and warning outputs, it will throw an error with a detailed explanation of the problem.
+
+\begin{figure}[H]
+	\centering
+	\caption{Lit error output}
+	\includegraphics[width=1\textwidth,height=250px]{images/testing/lit-code-error-out.png}
+	\label{fig:lit-test-err-out}
+\end{figure}
+
+\subsubsection{Lit error messages}
+
+The information contained inside this error message indicates which line was not given a match, even though it was expected. Although most of the time these error messages are hard to read and analyze, the minimum required to be understood is the fact they indicate that there is an error and the statistics or the testing (how many failed, succeeded, etc). Moreover, \lstinline{.tmp.cpp.msg} files can be used which contain the output of the actual checker, and to compare it manually with the outputs which were expected from lit. Sometimes those manual checks are even more helpful since there is a possibility of a wrong written test case, which could not be noticed by the machine itself.
+
+\begin{figure}[H]
+	\centering
+	\caption{Lit auto generated message warnings file}
+	\includegraphics[width=1\textwidth,height=270px]{images/testing/lit-code-error-out.png}
+	\label{fig:lit-test-msg-file}
+\end{figure}
+
+\subsubsection{Non-compliant test-cases}
+
+Overall, considering preconditions from table \ref{tab:checker-req}, here is the table of tests created for the both Top-down and Bottom-up approaches:
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.3\textwidth}|m{0.1\textwidth}|m{0.5\textwidth}|}
+        \hline
+        \textbf{Test case} & \textbf{Line} & \textbf{Description}  \\
+        \hline
+        if & 11:11  & Root assignment inside if statement \\
+        \hline
+        while & 17:14  & Root assignment inside while statement \\
+        \hline
+        do..while & 26:16  & Root assignment inside do...while statement \\
+        \hline
+        do..while & 30:38  & Assignment inside comma in selection statement \\
+        \hline
+        do..while & 34:45  & Assignment inside comma in selection statement \\
+        \hline
+        for & 37:23  & Assignment inside for loop condition \\
+        \hline
+        if with and & 44:12  & Assignment inside and operator   \\
+        \hline
+        while with and,or & 47:14, 47:24  & Assignments inside operands of and, or (with exception != 0) \\
+        \hline
+        while with and, or & 51:14, 51:24, 51:35  &   Assignments inside operands of and, or, case with having two operands != 0  \\ 
+        \hline
+    \end{tabular}
+    \caption{\\cert-assignment-in-selection.cpp test file non-compliant cases}
+    \label{tab:test-lit-1}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.3\textwidth}|m{0.1\textwidth}|m{0.5\textwidth}|}
+        \hline
+        \textbf{Test case} & \textbf{Line} & \textbf{Description}  \\
+        \hline
+        and  & 56:19  & Assignment inside operands of and (not in selection statement
+        ) \\
+        \hline
+        or  & 59:14  & Assignment inside operands of or (not in selection statement
+        ) \\
+        \hline
+        or  & 62:14  & Assignment inside operands of or (not in selection statement, || alias
+        ) \\
+        \hline
+        ternary in if  & 66:11, 66:23  & Ternary expression inside if, with third and first operand having assignment \\
+        \hline
+        ternary in if  & 71:15  & Ternary expression inside if, with second operand having assignment \\ 
+        \hline
+        ternary in while  & 75:22  & Ternary expression inside while, with third operand having assignment \\
+        \hline
+        ternary in if  & 78:11, 78:15  & Ternary expression inside if, with first operand having two assignments \\
+        \hline
+        ternary in while  & 83:15, 83:25, 83:40  & Ternary expression inside while, having first operand, second operand and, third operand assignment \\
+        \hline
+        nested ternary, comma in do...while  & 91:31, 91:39  & Ternary expression having comma expression in first operand, and nested third operand with assignment inside do..while \\
+        \hline
+        nested ternary & 96:25, 96:45  & Nested ternary having assignment inside while \\
+        \hline
+        ternary & 100:24, 100:32  & First operand of ternary having assignment outside of selection statements \\
+        \hline
+        ternary with comma & 106:26  & First operand of ternary having assignment between comma outside of selection statements \\
+        \hline
+        ternary with and & 110:17  & First operand of ternary having assignment between and expression outside of selection statements \\
+        \hline
+    \end{tabular}
+    \caption{\\cert-assignment-in-selection.cpp test file non-compliant cases (cont.)}
+    \label{tab:test-lit-2}
+\end{table}
+
+\subsubsection{Compliant test-cases}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.3\textwidth}|m{0.1\textwidth}|m{0.5\textwidth}|}
+        \hline
+        \textbf{Case} & \textbf{Line} & \textbf{Description}  \\
+
+        \hline
+        if  & 116  & Do while intentional assignment \\
+        \hline
+        while  & 119  & Do while intentional assignment \\
+        \hline
+        for  & 124  & For loop assignment outside condition \\
+        \hline
+        ternary  & 129  & Ternary expression third operand assignment outside selection statements  \\
+        \hline
+        ternary  & 132  & Ternary expression second and third operand assignment outside selection statements  \\
+        \hline
+        ternary  & 135  & Ternary expression second operand assignment outside selection statements  \\
+        \hline
+        function  & 139  & Assignment inside function call  \\
+        \hline
+        function  & 141  & Assignment inside function call for ternary expression  \\
+        \hline
+        if  & 147  & If does not have assignment \\
+        \hline
+        if  & 158  & If has equality operator \\ 
+        \hline
+        if  & 163 & Intentional assignment \\ 
+        \hline 
+        do..while  & 168 & Do while has equality operator \\ 
+        \hline 
+        do..while  & 172 & Last comma expression is equality operator \\ 
+        \hline 
+        for  & 176 & Function is used \\ 
+        \hline 
+        if  & 180 & Assignment in array expression \\ 
+        \hline 
+        if  & 181 & Assignment in array expression, with comma \\ 
+        \hline 
+        while  & 184 & Top parenthesis in while with ternary expression \\
+        \hline 
+        while  & 185 & Top parenthesis in while with comma \\
+        \hline 
+        while  & 186 & Top parenthesis in while with comma and ternary expression \\
+        \hline 
+        while  & 188 & Top parenthesis in while with multiple assignments \\
+        \hline 
+        while  & 190 & Top parenthesis in while with nested ternary expression \\
+        \hline 
+        while  & 194 & Compliant or in while \\
+        \hline 
+        while  & 194 & Compliant and as part of exception \\
+        \hline
+    \end{tabular}
+    \caption{\\cert-assignment-in-selection.cpp test file compliant cases}
+    \label{tab:test-lit-3}
+\end{table}
+
+\subsubsection{Testing code for CERT EXP-45C}
+
+The code corresponding \ref{tab:test-lit-1}, \ref{tab:test-lit-2}, \ref{tab:test-lit-3} tables:
+
+\newenvironment{code}{\captionsetup{type=listing}}{}
+
+\begin{code}
+\begin{minted}[linenos, breaklines, firstnumber=last]{cpp}
+// RUN: %check_clang_tidy %s cert-exp45-c %t
+
+void foo() {}
+int boo(bool i) {}
+
+void assignmentsInSelectionExpression() {
+    int A = 0, B = 0, C = 1, X = 2;
+    // triggers check 
+    if (A = B) {
+    // CHECK-MESSAGES: :[[@LINE-1]]:11: warning: assignment is not allowed inside if statement [cert-exp45-c]
+
+    // do something 
+    }
+
+    while (A = B) {
+    // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: assignment is not allowed inside while statement [cert-exp45-c]
+    
+    // do something 
+    }
+
+
+    do {
+
+    } while (C = B);
+    // CHECK-MESSAGES: :[[@LINE-1]]:16: warning: assignment is not allowed inside do while statement [cert-exp45-c]
+
+    // comma assignment violation case
+    do { /* ... */ } while (foo(), A = B);
+    // CHECK-MESSAGES: :[[@LINE-1]]:38: warning: assignment is not allowed inside do while statement [cert-exp45-c]
+    
+    // multiple commas check
+    do { /* ... */ } while (foo(), foo(), A = B);
+    // CHECK-MESSAGES: :[[@LINE-1]]:45: warning: assignment is not allowed inside do while statement [cert-exp45-c]
+
+    for (int i = 0; i = A; i++) {
+    // CHECK-MESSAGES: :[[@LINE-1]]:23: warning: assignment is not allowed inside for statement [cert-exp45-c]
+    }
+
+    // EX-2 CASES
+    int W;
+    bool Flag = false;
+    if ((X = W) && Flag) { /* ... */ }
+    // CHECK-MESSAGES: :[[@LINE-1]]:12: warning: assignment is not allowed inside and statement [cert-exp45-c]
+
+    while (X = 3 && (B = 3) && (X = 3) != 0 || (W = 6) != 0 || true) {}   
+    // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: assignment is not allowed inside while statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:24: warning: assignment is not allowed inside and statement [cert-exp45-c]
+
+    while (X = 3 && (B = 3) && (X = 3) || (W = 6) != 0 || true) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: assignment is not allowed inside while statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:24: warning: assignment is not allowed inside and statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-3]]:35: warning: assignment is not allowed inside and statement [cert-exp45-c]
+
+    bool Bol = (X = 3) && true;
+    // CHECK-MESSAGES: :[[@LINE-1]]:19: warning: assignment is not allowed inside and statement [cert-exp45-c]
+
+    Bol = (X = 3) || false;
+    // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: assignment is not allowed inside or statement [cert-exp45-c]
+   
+    Bol = (X = 3) or false;
+    // CHECK-MESSAGES: :[[@LINE-1]]:14: warning: assignment is not allowed inside or statement [cert-exp45-c]
+
+    // Ternary expressions
+    if (A = B ? 6 : A = 4) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:11: warning: assignment is not allowed inside if statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:23: warning: assignment is not allowed inside if statement [cert-exp45-c]
+
+    // 2. 2nd Operand case
+    if (W ? A = 5 : 8) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:15: warning: assignment is not allowed inside if statement [cert-exp45-c]
+
+    // 4. Inside conditional expressions
+    while (W ? 6 : A = 4) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:22: warning: assignment is not allowed inside while statement [cert-exp45-c]
+
+    if (X = W = A ? 4 : 6) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:11: warning: assignment is not allowed inside if statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:15: warning: assignment is not allowed inside if statement [cert-exp45-c]
+
+
+    while ((X = 4) ? (X = 5) && B : (W = 8)) {
+    // CHECK-MESSAGES: :[[@LINE-1]]:15: warning: assignment is not allowed inside ternary condition statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:25: warning: assignment is not allowed inside and statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-3]]:40: warning: assignment is not allowed inside while statement [cert-exp45-c
+    }
+
+    do {
+
+    } while (X = 1, X ? B : W = 4 ? A = 5 : 5 );
+    // CHECK-MESSAGES: :[[@LINE-1]]:31: warning: assignment is not allowed inside do while statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:39: warning: assignment is not allowed inside do while statement [cert-exp45-c]
+
+    // nested ternary
+    while (X ? true ? X = B : false ? B : W = X : W) {}
+    // CHECK-MESSAGES: :[[@LINE-1]]:25: warning: assignment is not allowed inside while statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:45: warning: assignment is not allowed inside while statement [cert-exp45-c]
+
+    bool Y = (true ? X = C : C = A) ? B = A : B = A;
+    // CHECK-MESSAGES: :[[@LINE-1]]:24: warning: assignment is not allowed inside ternary condition statement [cert-exp45-c]
+    // CHECK-MESSAGES: :[[@LINE-2]]:32: warning: assignment is not allowed inside ternary condition statement [cert-exp45-c]
+
+    int L = (A, B = A, X = W) ? 4 : 5; 
+    // CHECK-MESSAGES: :[[@LINE-1]]:26: warning: assignment is not allowed inside ternary condition statement [cert-exp45-c]
+
+    int XY = (A = B) && C ?: 5;
+    // CHECK-MESSAGES: :[[@LINE-1]]:17: warning: assignment is not allowed inside and statement [cert-exp45-c]
+}
+
+void assignmentsInSelectionEdgeCases() {
+    int A = 1, B = 4, C;
+
+
+    // Compliant Solution (Intentional Assignment)
+    do { /* ... */ } while (foo(), (A = B) != 0);
+
+    // Compliant Solution (Intentional Assignment)
+    if ((A = B) != 0) {
+        /* ... */
+    }
+
+    // Compliant Solution (Intentional Assignment)
+    for (int i = 0; i == A ; i = A, i++) {
+        /* do something */
+    }
+
+    // Compliant Solution (Ternary outside of Selection Statement)
+    A = B ? 6 : A = 4;
+
+    // Compliant Solution (Ternary outside of Selection Statement)
+    A = B ? B= 1 : A = 4;
+
+    // Compliant Solution (Ternary outside of Selection Statement)
+    A = B ? B = 3 : 4;
+
+
+    // True-Positive found from the running checker on FFmpeg
+    if (boo(A = B)) {}
+
+    A = boo(A = B) ? 12 : 5; 
+}
+
+void assignmentsOutsideSelection() {
+    const int A = 0;
+    int B = 0;
+    if (A) {
+        // do something 
+    }
+
+    // Compliant Solution (Unintentional Assignment)
+    if (A == B) {
+        /* ... */
+    }
+
+
+    // Compliant Solution (Intentional Assignment)
+    if ((B = A)) {
+        // do something 
+    }
+
+    // Compliant Solution (Intentional Assignment)
+    if ((B = A) != B) {
+        // do something 
+    }
+
+    // Compliant Solution (Assignment)
+    do { /* ... */ } while (foo(), A == B); 
+
+    int x, y;
+    float p, q;
+    do { /* ... */ } while (x = y, p == q);
+
+
+    // Compliant Solution For Loop (FuncCall)
+    for (; x; foo(), x = y) { /* ... */ }
+
+    int arr[10];
+    // Compliant Solution If (Array expression)
+    if (arr[x = y]) {}
+    if (arr[x, x = y])
+
+    // Compiant Solution (Top parenthesis)
+    while (((x = 4) ? (y = 5) && B : (p = 8))) {}
+    while ((x, x= y)) {}
+    while ((x, y = p ? y : p)) {}
+
+    while ((x = y = p)) {}
+
+    while (x == (p == ( x ? p : q) )) {}
+
+
+    // Compliant solution
+    while ('\t' == x || ' ' == x || '\n' == x) {}
+
+    if (((x = p) != 0) && x) {}
+};
+\end{minted}
+\caption{cert-assignment-in-selection.cpp content}
+\end{code}
+
+
+\subsection{Running analysis on large codebases}
+
+Checkers will be run on several big projects, with open source codebase, which might show some if we have any false positives, and will create a report based on their input. I will also show how the checkers are working in real-life projects, which have better performance and usability.
+
+\subsubsection{Projects for testing}
+Projects which will be used for analysis:
+
+\begin{itemize}
+    \item FFmpeg - FFmpeg is a popular tool for recording, converting, and streaming video written in C
+    \item LLVM - LLVM is one of the largest projects written in C++ with over 400k commits on GitHub, a big community of contributors, and strict architectural patterns for keeping the codebase clean.  
+    \item Linux kernel - free and open-source, Unix-like operating system kernel, written in C. 
+    \item MySQL Server - the world's most popular open-source database written in C++
+\end{itemize}
+
+\subsubsection{Reports script}
+
+For creating reports and storing profile JSON data (performance time output) a \lstinline{tests_apps_checker.sh} shell script was created. It has one required argument with the name of the folder on which the checker will be run. Other arguments could be seen after just running 
+
+\begin{listing}[h]
+\begin{minted}{shell}
+tests_apps_checker.sh
+# "[warn] Usage of script 'tests_apps_checker.sh <folder with c/c++ test files> <checks(optional?)> <max_file_count(optional)> <has_profile(optional)>'"
+\end{minted}
+\caption{Run \lstinline{tests_apps_checker.sh} in shell}
+\end{listing}
+
+Overall the code of the shell script is defined below:
+\begin{code}
+\begin{minted}{shell}
+#! /bin/bash
+
+# Don't run if it's on Windows
+IS_WINDOWS=0
+
+echo "$PATH" | grep -i "Windows" &>/dev/null
+if [ $? -eq 0 ] 
+then
+    echo "[info] 'PATH' contains 'Windows'" >&2
+    IS_WINDOWS = 1
+fi 
+
+if [[ ! -z "$windir" || ! -z "$WINDIR" ]]
+then
+    echo "[info] Found 'windir' variable!" >&2
+    IS_WINDOWS=1
+fi
+
+if [[ $IS_WINDOWS -eq 1 ]]
+then
+    echo "" >&2
+    echo "[fatal error] This script was designed to run in a" >&2
+    echo "POSIX-compliant environment, preferably long-term stable" >&2
+    echo "Debian or Ubuntu! It not only needs a proper Bash interpreter," >&2
+    echo "but a full environment properly." >&2
+    echo "" >&2
+    echo "However, It appears that you are using Windows. Please do not!" >&2
+    echo "" >&2
+    echo "It is preferable to use a real Linux system, or at least WSL." >&2
+    exit 1
+fi
+
+
+# Not enough arguments provided
+if [[ $# -lt 1 || $# -gt 5 ]]
+then 
+    echo "[warn] Usage of script '$0 <folder with c/c++ test files> <has_profile(optional)> <checks(optional?)> <max_file_count(optional)>'"
+    exit 1
+fi
+
+dst=$1
+max_file_count=10000
+has_profile=0
+checks=cert-exp45-c
+
+if [[ $# -ge 3 ]]
+then
+    checks=$3
+fi 
+
+if [[ $# -eq 4 ]]
+then 
+    max_file_count=$4
+fi
+
+if [[ $# -ge 2 ]]
+then 
+    has_profile=$2
+fi
+
+
+first_write=0
+array=()
+WHERE_AM_I=$(pwd)
+# OUTPUT_DIR=`${WHERE_AM_I}/assignment-checker-out`
+# get directories which are in the current dir and specified by the user
+
+# Different error prone tests
+check_build_dir() {
+    if [ ! -d $1 ]
+    then 
+        echo "[error] Argument variable: $1 is not a directory name"
+        echo ""
+        echo "This script requires working directory with C/C++ files."
+        echo "Please check your directory name and try again"
+        echo ""
+        exit 1
+    fi
+
+    if [ ! -d "${WHERE_AM_I}/Build" ] 
+    then
+        echo "[error] No Build directory in the root of the project!"
+        echo ""
+        echo "This script needs to have llvm binaries in the '/Build' directory"
+        echo "Try to run 'get_clang.sh' file before running this script"
+        echo ""
+        exit 1 
+    fi 
+
+    if [ ! -d "${WHERE_AM_I}/Build/bin" ] || [ ! "${WHERE_AM_I}/Build/bin/clang-tidy" ]
+    then
+        echo "[error] No clang-tidy binary found"
+        echo "" 
+        echo "This script needs clang-tidy binary for the correct execution" 
+        echo "Use this commands before:"
+        echo "  cd build"
+        echo "  ninja clang clang-tidy -j4"
+        echo ""
+        exit 1 
+    fi 
+}
+
+check_build_dir
+cd $dst
+WHERE_AM_I_NOW=$(pwd)
+
+directory=$(basename "$dst")
+
+handle_files() {
+    cfiles=("$@")
+    for cfile in $(echo $cfiles | tr " " "\n")
+    do
+        if [[ max_file_count -eq 0 ]]
+        then 
+            exit 0
+        fi
+        max_file_count=$max_file_count-1
+
+        # sleep 0.0001
+        # echo "[info] Starting clang script on file ${WHERE_AM_I_NOW}/${cfile}"
+
+        if [[ first_write -eq 0 ]]
+        then 
+            rm -rf .tmp/profile
+        fi 
+        mkdir -p .tmp 
+        if [[ has_profile -eq 1 ]]
+        then
+            result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} --enable-check-profile --store-check-profile=${WHERE_AM_I}/.tmp/profile -checks=-"*,${checks}" --) 
+        else 
+            result=$(${WHERE_AM_I}/Build/bin/clang-tidy ${cfile} -checks=-"*,${checks}" --) 
+        fi 
+        touch "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+        chmod 777 "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+        if [[ has_profile -eq 1 ]] || [[ "$result" == *"[cert-exp45-c]"* ]]; 
+        then 
+            # if [[ "$result" == *"[clang-diagnostic-error]"* ]] || [[ -z "$result" ]] 
+            # then
+            #     continue  
+            # fi
+            if [ -s $(${WHERE_AM_I}/.tmp/out-${directory}.txt) ] && [[ first_write -eq 0 ]]
+            then
+                echo "${result}" > "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+                first_write=1
+            else     
+                echo "${result}" >> "${WHERE_AM_I}/.tmp/out-${directory}.txt"
+            fi 
+        fi
+    done 
+}
+
+# Main program
+files_curr=`find ${WHERE_AM_I_NOW} -type f -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h"  -o -name "*.C" -o -name "*.cxx" -o -name "*.c++" -o -name "*.hh" -o -name "*.hxx" -o -name "*.hpp" -o -name ".h++"`
+handle_files "${files_curr[@]}"
+
+cd $WHERE_AM_I
+\end{minted}
+\caption{Content of \lstinline{tests_apps_checker.sh}}
+\end{code}
+
+The idea behind this script is simple: we run through all the files under the directory, take only the ones which have C/C++ extension, and run clang-tidy on them with certain checks. These checks can be defined by the user (for example later when we will compare the performance of different checker implementations, we need other configurations). The script also saves the warning messages from the files, so that the user can go through them and test if there is a true-positive case or not. Moreover, there is a simple edge case scenario handling, for example, if there is no clang-tidy under the current directory \lstinline{./Build/bin} then the code will exit with status 1 and an error message. Overall on big projects, it can take quite a of time to run it. 
+
+\subsubsection{Report script results}
+
+In the following table the summary of running test on different codebases
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.2\textwidth}|m{0.2\textwidth}|m{0.2\textwidth}|m{0.2\textwidth}|}
+        \hline
+        \textbf{Project} & \textbf{Warnings} & \textbf{TruePos} & \textbf{FalsePos}  \\
+        \hline
+        FFmpeg & 2 & 2 & 0 \\
+        \hline
+        LLVM & 0 & 0 & 0 \\
+        \hline
+        Linux Kernel & 4 & 3 & 1 \\
+        \hline 
+        MySQL Server & 15 & 13 & 2 \\
+        \hline
+    \end{tabular}
+    \caption{Top-down test results}
+    \label{tab:test-td-codebases}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.2\textwidth}|m{0.2\textwidth}|m{0.2\textwidth}|m{0.2\textwidth}|}
+        \hline
+        \textbf{Project} & \textbf{Warnings} & \textbf{TruePos} & \textbf{FalsePos}  \\
+        \hline
+        FFmpeg & 2 & 2 & 0 \\
+        \hline
+        LLVM & 2 & 2 & 0 \\
+        \hline
+        Linux Kernel & 26 & 3 & 23 \\
+        \hline 
+        MySQL Server & 30 & 14 & 16 \\
+        \hline
+    \end{tabular}
+    \caption{Bottom-up test results}
+    \label{tab:test-bu-codebases}
+\end{table}
+
+
+The result of running those tests gave a big insight into the flaws of both checkers. Moreover, the statistics about the number of false positives can inform about the amount of additional work every checker needs, after the first development phase is done. 
+
+
+As can be seen from the tables \ref{tab:test-bu-codebases}, \ref{tab:test-td-codebases} top-down approach had fewer false-positives than the bottom-up one. LLVM AST being parsed by recursive-decent technique does not provide enough API possibilities to track things that could be found upper in the traversal tree. For example, take let us analyze the following code block from Linux kernel:
+
+\begin{listing}[h]
+\begin{minted}{cpp}
+    if (symbol_conf.cumulate_callchain)
+		parent_total = entry->stat_acc->period;
+\end{minted}
+\caption{False positive code example}
+\label{code:bottom-up-fp-no-compound}
+\end{listing}
+
+Because our implementation relays on the fact that there is a selection ancestor, but it can not determine whether it is inside the conditional statement of the selection, we get the problem when there is no compound (put inside \{\} brackets). Even though the solution to fix this false-positive was found \ref{code:bottom-up-updated}, there is not much certainty that bottom-up will not throw more false positives. Moreover, the complexity of the code also increased, as a result of the changes.
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+    const auto SelectionAsParentCheck =
+      allOf(hasAncestor(implicitCastExpr(
+                hasParent(Selection),
+                // FP found in linux/tools/perf/ui/browsers/hists.c:1185:16
+                unless(has(binaryOperator(hasOperatorName("=")))))),
+            unless(anyOf(
+                // exception EX-3
+                hasAncestor(callExpr()),
+                // exception EX-2
+                hasAncestor(arraySubscriptExpr()),
+                // exception EX-2
+                hasAncestor(LogicalOperator),
+                // FP found in linux/tools/perf/util/intel-pt.c:1069:25
+                has(binaryOperator(hasOperatorName("="))))));
+\end{minted}
+\caption{Changes added to bottom-up from false-positives}
+\label{code:bottom-up-updated}
+\end{listing}
+
+However, an interesting detail was spotted; by having two checkers, we could also spot potential false-negative \ref{code:fls-neg} results relying on the fact that the results should be identical. So as it can be seen, bottom-up gave plus one true-positive result in the mysql-server test. 
+
+\begin{listing}[h]
+\begin{minted}{cpp}
+    ... 
+ } while (eptr ? (eptr = eptr->next) : nullptr);
+\end{minted}
+\caption{False-negative for the top-down approach}
+\label{code:fls-neg}
+\end{listing}
+
+The problem was that the detection of parenthesis was made from the assignment operator perspective. To make it viable that the warnings are disabled when the primary expression has only parenthesis, several adjustments were made which compromised the code complexity of the top-down approach even more. But on the positive side, the adjustments fixed all false positives as well.
+
+After adjustments, the registerMatcher \ref{code:top-down-updated} code is expected to detect all edge cases, which could happen in the targeted code. \\\\\\\\
+
+\begin{code}
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::registerMatchers(MatchFinder *Finder) {
+  // binary matchers
+  const auto AssignmentMatcher =
+      binaryOperator(isAssignmentOperator(),
+                     unless(anyOf(hasAncestor(callExpr()),
+                                  hasAncestor(arraySubscriptExpr()))))
+          .bind("assignment");
+  const auto CommaMatcher =
+      binaryOperator(hasOperatorName(","), hasRHS(AssignmentMatcher))
+          .bind("comma");
+  const auto AndOrMatcher = binaryOperator(
+      hasAnyOperatorName("&&", "||"),
+      forEach(implicitCastExpr(hasDescendant(AssignmentMatcher))),
+      // nested and | or expression. like ((x = y && b))
+      unless(hasAncestor(parenExpr())));
+
+  const auto MatchAssignment =
+      anyOf(AssignmentMatcher, CommaMatcher,
+            implicitCastExpr(anyOf(has(AssignmentMatcher), has(CommaMatcher))));
+  const auto ForEachConditional = conditionalForEachMatcher(forEach(stmt(
+      anyOf(MatchAssignment, has(parenExpr(has(stmt(MatchAssignment))))))));
+  // Conditions MatchAssignment
+  // Match conditions inside selection statements (expept ? operator)
+  const auto HasConditionMatcher = hasCondition(allOf(
+      forEachDescendant(
+          stmt(anyOf(implicitCastExpr(MatchAssignment), ForEachConditional))),
+      unless(implicitCastExpr(
+          anyOf(has(parenExpr()), has(implicitCastExpr(has(parenExpr()))))))));
+
+  // For the cases when (=) ? anything : anything.
+  const auto HasConditionCondionalMatcher = hasCondition(
+      allOf(forEachDescendant(stmt(anyOf(
+                implicitCastExpr(has(parenExpr(has(stmt(MatchAssignment))))),
+                ForEachConditional))),
+            unless(implicitCastExpr(
+                has(implicitCastExpr(has(parenExpr(has(parenExpr()))))))),
+            unless(hasAncestor(parenExpr()))));
+
+  Finder->addMatcher(
+      stmt(anyOf(whileStmt(HasConditionMatcher), ifStmt(HasConditionMatcher),
+                 doStmt(HasConditionMatcher), forStmt(HasConditionMatcher),
+                 conditionalHasConditionMatcher(HasConditionCondionalMatcher),
+                 AndOrMatcher))
+          .bind("assignment-not-allowed-expression"),
+      this);
+}
+\end{minted}
+\caption{Final iteration of top-down checker}
+\label{code:top-down-updated}
+\end{code}
+
+\subsection{Performance analysis}
+
+To make performance testing and analysis we need to create profile files from the clang-tidy checker time estimated evaluation. We also need additional checkers which will give us a rough understanding of how fast/slow the currently implemented checker is compared to the already implemented ones.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.4\textwidth}|m{0.6\textwidth}|}
+        \hline
+        \textbf{Command} & \textbf{What checker does}  \\
+        \hline
+        readability-inconsistent-declaration-parameter-name & checks that all declarations of the functions have same parameter names  \\
+        \hline
+        performance-no-int-to-ptr & detects if there is casting from integer to pointer \\
+        \hline
+        cert-dcl03-c & correct usage of static assert for testing \\
+        \hline
+        cert-flp30-c & detects loops with special incrementalism \\
+        \hline
+        cert-exp45-c & detects selection statements with assignment  \\
+        \hline
+    \end{tabular}
+    \caption{Tested checkers}
+    \label{tab:test-bu-codebases}
+\end{table}
+
+To do that we need to run \lstinline{test_apps_checker.sh} as the following:
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ tests_apps_checker.sh test_apps 1 readability-inconsistent-declaration-parameter-name,\
+$ performance-no-int-to-ptr,cert-dcl03-c,cert-flp30-c,cert-exp45-c 300
+\end{minted}
+\caption{Run \lstinline{tests_apps_checker.sh} in shell}
+\label{code:run-perf}
+\end{listing}
+
+This command will use all arguments which could be provided for the script. First, we write the name of the script itself, the folder of the codebase, if the profiling files will be generated or now (\lstinline{has_profile}), the list of checks (4 checks in our situation), and the maximum amount of files (we put 300 to be sure of the results).
+
+After a successful run, \lstinline{.tmp/profile} folder will contain \lstinline{.json} files with the profiling results. To analyze it python script will need to be created. We will use \lstinline{.ipynb} Jupiter computational environment. The main objectives of it will be:
+
+\begin{enumerate}
+    \item To generate a data frame out of JSON files
+    \item To store the data frame data in a form of \lstinline{.cvs} file
+    \item To analyze and graph the performance of each matcher. Export image as a result
+\end{enumerate}
+
+
+\subsubsection{Generate data frame from JSON files}
+
+\begin{code}
+\begin{minted}{python}
+# # Test Profile Results
+# 
+# This code will analize the output of `test_apps_checker.sh` script and will create a visual representaion of how fast each of the rules are running
+# 
+# ## Preconditions
+# 
+# `.tmp/profile` directory with profiled `.json` files.
+
+# ## Import libararies
+import pandas as pd 
+import os
+import json
+import matplotlib.pyplot as plt 
+
+# ## Traserve files and obtain its content
+big_json = []
+names = []
+for filename in os.listdir(os.getcwd() + "/.tmp/profile"):
+    with open(
+        os.path.join(os.getcwd() + "/.tmp/profile", filename),
+        'r') as f:
+       json_text = json.loads(f.read())
+       big_json.append(json_text["profile"])
+       filename = os
+                    .path
+                    .basename(f.name)
+                    .split('-')[1]
+                    .split('.json')[0]
+       names.append(filename)
+
+# # Create a dataframe and fix the columns
+
+df = pd.DataFrame(big_json)
+df['File Name'] = names
+columns = df.columns.tolist()
+columns.insert(0, columns.pop())
+df = df[columns]
+
+# ## Remove unnecessary dataframe parts
+df = df[df.columns.drop(list(df.filter(regex='.*\.sys|.*\.wall')))]
+\end{minted}
+\caption{Create data frame}
+\end{code}
+
+
+\subsubsection{Store the data frame data in a form of .cvs file}
+As the next step, we will store the data frame in a single file. To make the experiment clearer we will use two codebase parts: from \lstinline{sql-server/sql/auth} directory and \lstinline{FFmpeg/fftools}. In the end, we will export the dataset generated for each use case (table \ref{tab:ch-test-cats}) provided with the following code:  
+
+\begin{listing}[h]
+\begin{minted}{python}
+import uuid
+df.to_csv('.tmp/profile-pandas-{}.csv'.format(str(uuid.uuid4())), encoding='utf-8')
+\end{minted}
+\caption{Export file}
+\end{listing}
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.4\textwidth}|m{0.4\textwidth}|}
+        \hline
+        \textbf{Checker} & \textbf{Codebase}  \\
+        \hline
+        Top-down & SQL Server /auth directory  \\
+        \hline
+        Bottom-up & SQL Server /auth directory  \\
+        \hline
+        Top-down & FFmpeg /fftools directory  \\
+        \hline
+        Bottom-up & FFmpeg /fftools directory  \\
+        \hline 
+    \end{tabular}
+    \caption{Checkers testing}
+    \label{tab:ch-test-cats}
+\end{table}
+
+
+\subsubsection{Plot the checkers time performance}
+
+\begin{code}
+\begin{minted}{python}
+f = plt.figure()
+f.set_figwidth(4)
+f.set_figheight(1)
+plot = df.plot(
+    x="File Name",
+    y=[
+        # Comment out three lines below to see figure only for cert-exp45-c checkers
+        "time.clang-tidy.readability-inconsistent
+        -declaration-parameter-name.user",
+        "time.clang-tidy.performance-no-int-to-ptr.user",
+        "time.clang-tidy.cert-dcl03-c.user",
+        "time.clang-tidy.cert-flp30-c.user",
+        "time.clang-tidy.cert-exp45-c.user", 
+    ], 
+    kind="bar"
+)
+plt.xlabel("File")
+plt.ylabel("Time (milliseconds)")
+plot.set_xticklabels([])
+plt.figure(figsize=(1,0), dpi=1000)
+plt.show()
+\end{minted}
+\caption{Plot the performance}
+\end{code}
+
+
+\subsubsection{Results}
+
+\paragraph{For FFmpeg 22 files \\}
+
+Let us first analyze results for FFmpeg \lstinline{/fftools} directory on both checkers. 
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\linewidth]{images/performance/td-ffmpeg-1.png}
+  \captionof{figure}{Top down}
+  \label{fig:perf-ffmpeg-td}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\linewidth]{images/performance/bun-ffmpeg-1.png}
+  \captionof{figure}{Bottom up}
+  \label{fig:perf-ffmpeg-bu}
+\end{minipage}
+\end{figure}
+
+It is evident, that the "Top-down" solution is at least twice slower for the same inputs, while the maximum for the "Top-down" is at ~0.016 milliseconds, for "Bottom-up" it is only 0.010 milliseconds, which is almost two times less. Let us also compare other parameters to be sure about the deduction correctness.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.3\textwidth}|m{0.3\textwidth}|m{0.3\textwidth}|}
+        \hline
+        \textbf{Measures} & \textbf{Top-down} & \textbf{Bottom-up}  \\
+        \hline
+        count  &   22.000000 & 22.000000 \\
+        mean   &  0.004096 & 0.001918 \\
+        std    &   0.005687 & 0.002744 \\
+        min    &   0.000001 & 0.000004 \\
+        25\%    &   0.000033 & 0.000026 \\
+        50\%    &   0.001455 & 0.000753 \\
+        75\%    &   0.005126 & 0.002896 \\
+        max    &   0.016895 & 0.010585 \\
+        \hline 
+    \end{tabular}
+    \caption{Checkers testing}
+    \label{tab:perf-test-res}
+\end{table}
+
+From the deviation, we get the same result for the whole codebase analyzed, meaning that there is a high possibility of having a bottom-up checker working twice as fast as its competitor. But according to the initial estimations, the bottom-up checker should be slower as the parsing of the AST tree is going from top to bottom. However, there are more things to consider in practice. To find out the answers, we need to bring the number of statements every checker is checking its containment. For the top-down the checker is initially looking for any of these statements/operators:  "if",  "while", "do..while", "?:", "\&\&", "||". For the bottom-up approach on the contrary it's only the "=" operator. Let us now check their distribution in \lstinline{ffprobe.c} which has the biggest time complexity for top-down and the second biggest for bottom-up.
+
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.4\textwidth}|m{0.4\textwidth}|}
+        \hline
+        \textbf{Statement/Expression} & \textbf{Amount}  \\
+        \hline
+        if conditions  &  331 matches \\
+        for loop  &  27 matches \\
+        while loop  &  13 matches \\
+        do..while loop  & 80 matches \\
+        ternary operator  & 27 matches \\
+        and operator  & 49 matches \\
+        or operator  & 27 matches \\
+        \hline 
+        Sum for top-down & 554 matches \\
+        \hline 
+        assignment operator &  212 matches \\
+        \hline 
+    \end{tabular}
+    \caption{Statements distribution}
+    \label{tab:stmt-dist}
+\end{table}
+
+From table \ref{tab:stmt-dist} we can make a valid assumption, which explains why the second approach works faster: the assignment operator is used less than the selection statements (in this particular example only if the statements amount transcends the assignments). 
+
+\paragraph{For mysql 45 files \\}
+
+Let us analyze it further, my second pair of datasets. In the figures \ref{fig:perf-mysql-bu}, \ref{fig:perf-mysql-td} though the graph gives us some more insight into both two checkers differentiate. We see that the top-down matcher is much smoother than the bottom-up, which is the worst-case scenario can behave closely to the worst top-down.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\linewidth]{images/performance/td-mysql-1.png}
+  \captionof{figure}{Top down}
+  \label{fig:perf-mysql-td}
+\end{minipage}%
+\begin{minipage}{.5\textwidth}
+  \centering
+  \includegraphics[width=1\linewidth]{images/performance/bu-mysql-1.png}
+  \captionof{figure}{Bottom up}
+  \label{fig:perf-mysql-bu}
+\end{minipage}
+\end{figure}
+
+If we will take as an example the most divergent from the norm in the second plot file \lstinline{sha2_password.cc}, after selecting some root AST statements, it will be noticed, that even though selection expressions are double the amount (1950 against 956), the bottom-up is slower by 1.33x. Here, it can be only estimated why there is such behavior, as there are \lstinline{hasAncestor} calls in the final code of checker, each of them can slow down the performance if certain conditions are met. Overall, profiling is a great tool, which provides a lot of useful meta-data about the code execution, which could be used not only for fixing the performance of the checkers but also to analyze their nature, how they are working under different conditions and which solution might be the most preferable at the moment.
+
+
+\subsection{Readability}
+
+As this patch will be part of a big open-source project readability of the code should be carefully considered. Moreover, it was proven that developers spend much more time reading the code than writing it from scratch \cite{code-read-write}. 
+
+Even though there are some tools that can measure the complexity of the code, the checkers should be evaluated differently, because even though the concepts remain the same, nesting comes from the usage of functions, and the branching from expanding the argument list of functions.
+
+Overall both checkers are pretty complex to understand, there are a lot of edge cases that have to be restricted problematically. It is even more in the case of the bottom-up approach which has 7 unless statements compared to the ones from the top-down. And even though, the top-down solution has a few more lines of code than the bottom-up, it's matcher it more natural for the understanding not only for the computer but for the human as well. 
+
+
+\subsection{Conclusion}
+
+
+The performance analysis showed unexpected results in terms of the performance of the solutions proposed and it can be clearly seen that there are definitely more advantages of the top-down approach than disadvantages. Apart from being more human-readable, it is also less exposed to miscalculations and appearances of false positives. However, the other checker implementation also created a lot of benefits for the project overall. One big gain was by showing the false-negatives of the other checker, that some techniques which have been used while creating this checker, like finding the first operand under the comma operator, could be later applied for the other implementations, as a part of a small patch. 

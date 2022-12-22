@@ -1,0 +1,66 @@
+\section{Static Analysis Techniques}
+
+Depending on the complexity of the bugs and inconsistencies we are willing to find in the code, different concepts for static analysis can be used. All of these techniques are valid for their use cases, and same as with the concept of machines/automata should be dependent on the overall depth of the final problem \cite{analysis-techniques}. 
+
+\subsubsection{Pattern Matching} 
+
+Some analyses can be implemented on the source code directly. This could be achieved through pattern matching of the tokens. This is the most intuitive representation for developers, as it can be also useful to analyze certain patterns which might be malicious. It is also the most effective if we consider the usage of memory and computer power, as it uses Lexer as its source of truth. A good representation of a checker which relays only on the lexical analysis can be \lstinline{readability-identifier-naming} checker because it checks if the tokens correspond to the rules of Clang. However, the main disadvantage of this type of checker is that the tokenized source code does not reveal the structure of the software which is added by the parser. Thus it is impossible to implement a checker for more complex cases which involve the usage of semantics. Check code snippet \ref{code:limit-text-analysis} for more explanation.
+
+\begin{listing}[H]
+\begin{minted}{c}
+#define Z 0
+#define DIV(a, b) ((a)/(b))
+int main()
+{
+    int a = 1 / 0; // found trivially
+    int b = 1 / Z; // needs preprocessor information
+    int c = DIV(1, 0); // same as above
+    // not detected by naive implementations
+    int d = 1 / (1 - 1);
+    int e = DIV(1, 1) / (DIV(1, 1) - DIV(1, 1));
+}
+\end{minted}
+\caption{Limitations of the textual analysis}
+\label{code:limit-text-analysis}
+\end{listing}
+
+
+\subsubsection{AST Matching}
+
+More detailed information regarding the types and structure of the program reveals Abstract Syntax Tree. As the parser is the source of information used in AST, this type of analysis can not be created without the first two steps of compilation happening. Therefore, parsing source code is the prerequisite of this type of static analysis. Even though this analysis technique is considered powerful, there are still edge cases, when dynamically changed properties of the program will not be spotted by the AST description. A good example of an AST Matching problem can be the EXP45-C issue described in \autoref{section:exp45-c}. Because the analysis relays on the context where the assignment is found (only selection statements, under certain conditions), it makes a perfect case to study and implement the matcher using full AST power. 
+
+\begin{listing}[H]
+\begin{minted}{c}
+void fun_func() {
+    ... 
+    return;
+}
+
+int main() {
+    fun_func();
+    return 0;
+}
+\end{minted}
+\caption{Code for AST}
+\label{code:ast-text-analysis-code}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{C}
+callExpr(
+  callee(functionDecl(
+        hasName("fun_func")
+    )
+  )
+)
+\end{minted}
+\caption{Basic AST checker}
+\label{code:ast-analysis-ast}
+\end{listing}
+
+
+\subsubsection{Path-sensitive analysis}
+
+This type of analysis is implemented by Clang Static Analyzer, by design \cite{clang-sa-guide}. The program analyzes all possible paths of the program and uses symbolic execution of it. That is why the execution of it grows exponentially with direct relation to the number of execution paths there are in the executed code. Thus, the practical path-sensitive analysis uses heuristics in order to select the certain subset needed for analysis. A good example when the AST will not be enough can be a trivial case on whether the \lstinline{main} function was called inside main or not (not resulting in an infinite loop of execution). It is also a good tool for excluding false-positive test results (for example division by zero in the code which will not be executed). Though this thesis will not cover it in more detail, a former ELTE student Zuka Tsinadze made an excellent work by writing a thesis and \href{https://github.com/llvm/llvm-project/tree/main/clang/lib/StaticAnalyzer/Checkers/cert}{two major checkers} for LLVM involving program path analysis. 
+
+

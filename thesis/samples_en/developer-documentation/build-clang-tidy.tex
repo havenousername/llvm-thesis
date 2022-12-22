@@ -1,0 +1,39 @@
+\section{Build clang-tidy}
+
+LLVM official repository will be used as the source of truth for creating the build. As the first step, it is advised to make sure that all the dependencies like CMake and ninja are installed and have the latest version (Check the Table \ref{tab:prerequisites}).
+
+
+\begin{listing}
+\begin{minted}{bash}
+$ # Creating build directory...
+$ git clone https://github.com/llvm/llvm-project.git
+$ mkdir Build
+$ cd ./Build
+$ # Running 'cmake' for build generation...
+$ # more about the https://llvm.org/docs/CMake.html
+$ cmake \
+      -G "Ninja" \
+      -DLLVM_ENABLE_PROJECTS="llvm;clang;clang-tools-extra" \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DBUILD_SHARED_LIBS=ON \
+      -DLLVM_TARGETS_TO_BUILD=X86 \
+      -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+      -DLLVM_ENABLE_ASSERTIONS=ON \
+      -DLLVM_ENABLE_BINDINGS=OFF \
+      -DLLVM_USE_LINKER=gold \
+      -DLLVM_USE_RELATIVE_PATHS_IN_FILES=ON \
+      ../llvm-project/llvm/
+$ # Building clang and clang-tidy with ninja tool
+$ # -j4 specifies the number of jobs done in parallel
+$ # usually build for clang might take a while (around one hour depending on your machine specs.)
+$ ninja clang clang-tidy -j4
+$ # if you need to run all tests, or to rerun build  
+$ ninja check-all -j 4
+$ # if you need to run clang-tidy tests only, or to rerun clang binaries build
+$ ninja clang-tidy
+\end{minted}
+\caption{Building LLVM environment}
+\label{code:build-llvm-dev}
+\end{listing}
+
+

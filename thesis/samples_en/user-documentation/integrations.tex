@@ -1,0 +1,306 @@
+\section{Clang tidy integrations}
+
+One of the easiest out-of-the-box solutions to use clang-tidy is to have it as part of your development environment setup. In the table \ref{tab:tidy-integrations} you can find the integration environments which support clang-tidy.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{2.5cm}| >{\centering\arraybackslash} m{2cm}|>{\centering\arraybackslash} m{2cm}|>{\centering\arraybackslash} m{2cm}|>{\centering\arraybackslash} m{2cm}|>{\centering\arraybackslash} m{2cm}|}
+         \hline \scriptsize{\textbf{Tool}} & 
+         \textbf{\scriptsize{On-the-fly inspection}} & 
+         \textbf{\scriptsize{Check list configuration (GUI)}} & 
+         \textbf{\scriptsize{Options to checks (GUI)}} &
+         \textbf{ \scriptsize{Configuration via .clang-tidy files}} &
+         \textbf{ \scriptsize{Custom clang-tidy binary}} \\
+
+         \hline  \scriptsize{A.L.E. for Vim} & \scriptsize{+} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-}  \\
+
+         \hline  \scriptsize{Clang Power Tools for Visual Studio} & \scriptsize{-} & \scriptsize{+} &  \scriptsize{-} &  \scriptsize{+} &  \scriptsize{-}  \\
+
+         \hline  \scriptsize{Clangd} & \scriptsize{+} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{+} &  \scriptsize{-}  \\
+
+         \hline  \scriptsize{CLion IDE} & \scriptsize{+} & \scriptsize{+} &  \scriptsize{+} &  \scriptsize{+} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{CodeChecker} & \scriptsize{-} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{CPPCheck} & \scriptsize{-} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-}  \\
+
+         \hline  \scriptsize{CPPDepend} & \scriptsize{-} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-}  \\
+
+         \hline  \scriptsize{Flycheck for Emacs} & \scriptsize{+} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{+} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{KDevelop IDE} & \scriptsize{-} & \scriptsize{+} &  \scriptsize{+} &  \scriptsize{+} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{Qt Creator IDE} & \scriptsize{+} & \scriptsize{+} &  \scriptsize{-} &  \scriptsize{+} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{ReSharper C++ for Visual Studio} & \scriptsize{+} & \scriptsize{+} &  \scriptsize{-} &  \scriptsize{+} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{Syntastic for Vim} & \scriptsize{+} & \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{+}  \\
+
+         \hline  \scriptsize{Visual Assist for Visual Studio} & \scriptsize{+} & \scriptsize{+} &  \scriptsize{-} &  \scriptsize{-} &  \scriptsize{-}  \\  \hline
+    \end{tabular}
+    \caption{Clang tidy integrations}
+    \label{tab:tidy-integrations}
+\end{table}
+
+The next step will describe steps to install and use clang-tidy in your preferred environment 
+
+\subsection{Code Editors - Clangd}
+Clangd \cite{clangd} is a language server that provides C++ IDE features to editors. It can be used for most of the editors available on the market as a plugin (VSC, Emacs, Sublime Text). As Visual Studio Code is considered to be the most used code editor, we will use it as an example. 
+
+\begin{enumerate}
+  \item Go to the VS Code extensions and search for clangd
+  \item Click install for the installation to begin
+        \begin{figure}[H]
+	   \centering
+            \caption{Install clangd extension}
+	   \includegraphics[width=0.8\textwidth,height=200px]{images/clangd/clangd-vscode-1.png}
+	   \label{fig:vscode-clangd-01}
+        \end{figure}
+  \item If there is no clangd installed on your computer VS Code will ask you to install it
+        \begin{figure}[H]
+	   \centering
+            \caption{Install clangd}
+	   \includegraphics[width=0.7\textwidth,height=200px]{images/clangd/clangd-vscode-2.png}
+	   \label{fig:vscode-clangd-02}
+        \end{figure}
+    \item After installation, a restart of VS Code will be needed and clangd should be enabled from the Settings (path  "Settings | Extensions | C/C++ ") and click on the flag "C\_Cpp › Code Analysis › Clang Tidy › Code Action: Show Documentation". You need to also additionally configure which rules clang-tidy should activate. In the example from \ref{fig:vscode-clangd-03}, you can see the standard configuration (all checks enabled). For more information, you can search the docs: \url{https://clang.llvm.org/extra/clang-tidy/index.html#using-clang-tidy}
+        \begin{figure}[H]
+	   \centering
+            \caption{Clang-tidy Configuration}
+	   \includegraphics[width=0.8\textwidth,height=200px]{images/clangd/clangd-vscode-3.png}
+	   \label{fig:vscode-clangd-03}
+        \end{figure}
+\end{enumerate}
+
+\subsection{CLion Integration}
+
+CLion IDE developed and distributed by JetBrains is a commercial cross-platform product used for coding in C/C++. It is considered to have the best refactoring tools and has native support of the clang-tidy. If you want to add your version of clang-tidy it is possible through "Settings/Preferences | Languages \& Frameworks | C/C++" as it is shown in image \ref{fig:clion-clang-tidy} 
+
+\begin{figure}[H]
+	\centering
+        \caption{CLion clang-tidy in Settings}
+	\includegraphics[width=0.7\textwidth,height=200px]{images/clion/clion-clang-tidy.png}
+	\label{fig:clion-clang-tidy}
+\end{figure}
+
+You can also configure the default one if you will go to "Settings/Preferences | Editor \& Inspections | C/C++ | General" as it is shown in image \ref{fig:clion-clang-tidy-conf}
+
+\begin{figure}[H]
+	\centering
+        \caption{Edit clang-tidy configuration in CLion}
+	\includegraphics[width=0.7\textwidth,height=200px]{images/clion/clion-clang-tidy-edit.png}
+	\label{fig:clion-clang-tidy-conf}
+\end{figure}
+
+Apart from having clang-tidy fully integrated as it is shown in table \ref{tab:tidy-integrations}, it also supports Clangd language server. More information you can find in this official documentation from JetBrains: \url{https://www.jetbrains.com/help/clion/2021.1/clang-tidy-checks-support.html?utm\_source=product&utm\_medium=link&utm\_campaign=CL&utm\_content=2021.1#conffiles}
+
+
+\subsection{CodeChecker integration}
+
+As it is shown on the \ref{tab:tidy-integrations} integrations table, clang-tidy is part of many static analyzer tool frameworks. These frameworks might be useful when trying to create outputs in a human-readable format or to perform statistics operations on big chunks of code. In this paper, there will be given examples of clang-tidy usage in one of the most popular analyzer tools: CodeChecker. 
+
+\subsubsection{CodeChecker Installation} 
+CodeChecker \cite{codechecker-elte} is a software project created in collaboration between Eötvös Loránd University and Ericsson, which puts as the main goal is to find potential software bugs in C/C++ programs. It is built on the LLVM/Clang Static Analyzer toolchain. 
+
+There are many ways how to install CodeChecker, the most user-friendly being installation through pip3 (Python 3 package manager). Here is the command to install it: "pip3 install codechecker". 
+
+In case the user employs Python of version 2 they can either update their Python or try to use another way of installation (in that case the installation will be available only for Linux and macOS).
+
+\begin{itemize}
+\item \textbf{For Linux}
+ Here, it will be explained how to install CodeChecker from the source code. 
+ \begin{enumerate}
+    \item Install all dependencies for the installation and development
+    \begin{listing}[H]
+    \begin{minted}{bash}
+    $ sudo apt-get install clang clang-tidy cppcheck build-essential curl gcc-multilib git python3-dev python3-venv
+    \end{minted}
+    \caption{Install deps. from terminal}
+    \end{listing}
+    
+    \item Install node-js and npm (for Ubuntu/Debian). Otherwise check the docs: \url{https://nodejs.org/en/download/package-manager/}
+    \begin{listing}[H]
+    \begin{minted}{bash}
+    $ curl -sL https://deb.nodesource.com/setup_16.x | sudo -E bash - 
+    $ sudo apt-get install -y nodejs
+    \end{minted}
+    \caption{Install node-js and npm from terminal}
+    \end{listing}
+    
+    \item Clone the source code into your machine
+    \begin{listing}[H]
+    \begin{minted}{bash}
+    $ git clone https://github.com/Ericsson/CodeChecker.git --depth 1 ~/codechecker
+    $ cd ~/codechecker
+    \end{minted}
+    \caption{Close source code}
+    \end{listing}
+    
+    \item Create a python virtual environment and set it as an active environment
+    \begin{listing}[H]
+    \begin{minted}{bash}
+    $ make venv
+    $ source $PWD/venv/bin/activate
+    \end{minted}
+    \caption{Python venv}
+    \end{listing}
+    
+    \item Build and install package. Add it to the environmental variables
+    \begin{listing}[H]
+    \begin{minted}{bash}
+    $ make package
+    $ # After a while...
+    $ export PATH="$PWD/build/CodeChecker/bin:$PATH" 
+    $ cd ..
+    \end{minted}
+    \caption{Build and install package}
+    \end{listing}
+ \end{enumerate}
+
+\item \textbf{or Mac Os}
+    \begin{enumerate}
+        \item Install all dependencies
+        \lstset{caption={Bash/Terminal code}}
+        \begin{listing}[H]
+        \begin{minted}{bash}
+    $ brew update
+    $ brew install gcc git
+    $ pip3 install virtualenv
+    $ brew install llvm@15.0.0
+    $ brew install npm
+        \end{minted}
+        \caption{Install deps. on Mac OS}
+        \end{listing}
+        
+        \item Other steps are similar to the Linux installation  
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{CodeChecker Clang-Tidy Configuration }
+By default, CodeChecker uses clang-tidy from the standard user's path (\lstinline{usr/include/clang}). For our demonstration purposes, we will use a customized version from LLVM project build binaries. We have to change the configuration file \lstinline{~/codechecker/build/CodeChecker/config/package_layout.json}. Value "clang-tidy" should be changed to the build path to \lstinline{path/to/llvm-project/build/bin/clang-tidy}. 
+
+\subsubsection{CodeChecker Usage} 
+
+CodeChecker gives a vast variety of use cases, but the one this thesis covers is revolved around clang-tidy usage. However, the steps specified below can be easily applied to the "clang-sa" checkers, if there is a need for it. FFmpeg library will be used for creating an analysis report.
+
+Firstly, ensure that CodeChecker executable is working (just by typing CodeChecker), and that the terminal window is under CodeChecker environment (should be written as in figure \ref{fig:clion-codechecker-env})
+
+\begin{figure}[H]
+	\centering
+        \caption{Check CodeChecker environment}
+	\includegraphics[width=0.7\textwidth,height=150px]{images/codechecker/01.png}
+	\label{fig:codechecker-env}
+\end{figure}
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ git clone https://github.com/FFmpeg/FFmpeg.git
+$ cd FFmpeg
+$ make configure
+$ ./configure --prefix=/usr
+$ CodeChecker log  -b "make all -j42" -o compile_commands.json
+\end{minted}
+\caption{Preparing for analysis}
+\end{listing}
+
+This command will generate JSON file containing compilation information for the build of the FFmpeg analysis. This file is passed to the analyze command as it is described below:
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ CodeChecker analyze compile_commands.json \
+$ --analyzers clang-tidy \
+$ --enable cert-assignments-in-selection \
+$ -o ~/codechecker-out
+\end{minted}
+\caption{Create clang-tidy Analysis}
+\end{listing}
+
+After the "analyze" command finishes, it creates ".plist" files, which could be outputted into the terminal, or converted to HTML files though the "parse" command. Let us check both solutions and their results. 
+
+\subsubsection{Terminal usage} 
+    
+\begin{listing}[H]
+\begin{minted}{bash}
+$ CodeChecker parse ~/codechecker-out
+\end{minted}
+\caption{Terminal output}
+\end{listing}
+
+\begin{figure}[H]
+\centering
+    \caption{Terminal Window}
+\includegraphics[width=0.7\textwidth,height=150px]{images/codechecker/02.png}
+\label{fig:codechecker-term}
+\end{figure}
+    
+\subsubsection{Static HTML} 
+    
+\begin{listing}[H]
+\begin{minted}{bash}
+$ mkdir ~/ws
+$ CodeChecker parse codechecker-out -e html -o ws/reports.html
+\end{minted}
+\caption{HTML output}
+\end{listing}
+
+\begin{figure}[H]
+\centering
+    \caption{Bug List}
+\includegraphics[width=1\textwidth,height=220px]{images/codechecker/03.png}
+\label{fig:codechecker-html-list}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \caption{Assignment in Selection Bug}
+\includegraphics[width=1\textwidth,height=220px]{images/codechecker/04.png}
+\label{fig:codechecker-html-file}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+    \caption{Statistics}
+\includegraphics[width=0.8\textwidth,height=220px]{images/codechecker/05.png}
+\label{fig:codechecker-html-stats}
+\end{figure}
+
+\subsubsection{Codechecker Server}
+
+Finally, if there is a need for multiple projects analyses, CodeChecker gives the possibility to run the server, with a complex front-end UI, you can run:
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ CodeChecker server \
+$ --workspace ~/codechecker-out \
+$ --port 8080
+\end{minted}
+\caption{Initialize CodeChecker server}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ # here we will use Default project for storing data
+$ CodeChecker store ~/codechecker-out \
+$ --name "cert-assignment-in-selection" \
+$ --url http://localhost:8080/Default
+\end{minted}
+\caption{Store the data from ".plist" files into CodeChecker Database}
+\end{listing}
+
+\begin{figure}[H]
+    \centering
+        \caption{CodeChecker Server UI, list of reports}
+    \includegraphics[width=1\textwidth,height=250px]{images/codechecker/06.png}
+    \label{fig:codechecker-html-server}
+\end{figure}
+
+
+\begin{figure}[H]
+    \centering
+        \caption{CodeChecker Server UI, file reports}
+    \includegraphics[width=1\textwidth,height=250px]{images/codechecker/07.png}
+    \label{fig:codechecker-html-server}
+\end{figure}
+
+
+For more information you can address official documentation of \href{https://codechecker.readthedocs.io/en/latest/}{CodeChecker} or \href{https://www.youtube.com/watch?v=sQ2Qj0kHoRY&t=2487s}{this Youtube video} 

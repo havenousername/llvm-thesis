@@ -1,0 +1,491 @@
+\section{CERT EXP45-C Basic Implementation}
+
+This section will contain the implementations for the EXP45-C CERT rule. Firstly, we will discuss the basic rule which simulates \lstinline|-Wparentheses|. The next step is to create a checker which will comply with all edge case solutions from the documentation. Having several implementations will lead the last subsections to the topic of performance and testing of these solutions, choosing the most fitting one to the requirements which were set.
+
+\subsection{Using clang-query for creating simple matcher}
+
+Let's create a basic test file with the following code:
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+    int main() {
+        int a,b = 0;
+        // this will be spotted as a warning by standard clang analyser as well
+        if (a = b) {
+            // some code
+        }
+        return 0;
+    }
+\end{minted}
+\caption{If case program}
+\end{listing}
+
+After that we need to use \lstinline|clang-tidy| from last chapter and output the whole AST of the file (without  "\#include"s' it will be relatively small). We should get the result from 
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ clang-query if.cpp
+\end{minted}
+\caption{Run clang-query with \lstinline{if.cpp}}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+> set output detailed-ast
+> m translationUnitDecl()
+\end{minted}
+\caption{Show \lstinline{if.cpp} AST}
+\end{listing}
+
+\begin{figure}[H]
+	\centering
+	\caption{\lstinline|if.cpp| query results}
+	\includegraphics[width=1\textwidth,height=250px]{images/implementation/if-01.png}
+	\label{fig:if-case-query}
+\end{figure}
+
+After analyzing the AST tree diagram it is obvious that the pattern we are looking for should be an assignment operator, or in other words, we are searching in the code places with the \lstinline{=} operator used. However, this is where AST becomes handy, we need to select only the parts of code where \lstinline{=} is used inside the "if" statement. Here is the structogram of what we will do.
+
+
+\begin{figure}[H]
+	\centering
+	\caption{If matcher diagram}
+	\includegraphics[width=0.4\textwidth,height=160px]{images/implementation/if-checker-diag.png}
+	\label{fig:if-case-diagram}
+\end{figure}
+
+As Clang AST matchers have a very explicit language, by analyzing output from \ref{fig:if-case-query} query result we can estimate the correct matcher \lstinline|ifStmt(hasDescedant(implicitCastExpr(hasDescendant(binaryOperator(hasOperatorName("=")))))))|. Let's check it out with the \lstinline{clag-query} tool.
+
+\begin{figure}[H]
+	\centering
+	\caption{If clang-query output}
+	\includegraphics[width=1\textwidth,height=120px]{images/implementation/if-query.png}
+	\label{fig:if-case-diagram}
+\end{figure}
+
+
+\subsection{Checker creation pipeline}
+
+To create a new \lstinline{clang-tidy} which would comply with all standards of the LLVM library, a special python script under "clang-tidy" directory is used. 
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ cd LLVM/llvm-project/clang-tools-extra/clang-tidy
+$ # add_new_check.py group_of_rules rule-01
+$ add_new_check.py cert assignments-in-selection
+\end{minted}
+\caption{Create new checker classes}
+\end{listing}
+
+This script will:
+\begin{itemize}
+    \item create the class for your check inside the specified module's directory and
+    register it in the module and in the build system;
+    \item create a lit test file in the "test/clang-tidy/" directory;
+    \item create a documentation file and include it into the
+    "docs/clang-tidy/checks/list.rst".
+\end{itemize}
+
+After using this command you can go to the \lstinline{.h} header file of your checker. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void registerMatchers(ast_matchers::MatchFinder *Finder) override;
+void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
+\end{minted}
+\caption{Methods which need to be defined}
+\end{listing}
+
+Two methods described above will need to be extended and defined for every newly created checker. Some methods add macros access, but they will not be discussed in this thesis paper. All that is left to do is to implement these methods in the \lstinline{.cpp} file. We will bind to the Finder from \lstinline{registerMatchers} list of matchers we want to have in the checker (in our case it will be done). \lstinline{check} method is responsible for creating output log data with warning messages depending on the matchers spotted before. Overall, the code for simplified check in the \lstinline{.cpp} file will look similar to \ref{code:simple-if-checker}.
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::registerMatchers(
+ast_matchers::MatchFinder *Finder) {
+    const auto Matcher = ifStmt(hasDescedant(
+    implicitCastExpr(hasDescendant(
+    binaryOperator(hasOperatorName("=")))))));
+    Finder->addMatcher(Matcher.bind("if-selection"), this);
+}
+void AssignmentsInSelectionCheck::check(const ast_matchers::MatchFinder::MatchResult &Result) {
+    const auto *Matched = Result.Nodes.getNodesAs<Stmt>("if-selection");
+
+    if (Matched) {
+        diag(Matched->getOperatorLoc(),
+         "assignment is not allowed inside if selection");
+    } 
+}
+\end{minted}
+\caption{Methods which need to be defined}
+\label{code:simple-if-checker}
+\end{listing}
+ 
+
+
+\section{CERT EXP45-C Implementation}
+
+After learning the basics of the new checker creation, we can proceed to the real-life case of creating \lstinline{EXP45-C} rule checker. According to previous experience and knowledge of how the compiler works (talking specifically about the parsing phase), it is known that the parsing of the source code tokens can be done with top-down or bottom-up approaches. The same could be said about the current checker. Mainly it looks for the assignment operator under a certain context, so we can either look for this context and check if it has the assignment or finds the assignment and check the context where it is in. This is what will be analyzed in the current subsection.
+
+
+Because C/C++ are not fully context-free languages, their parsing can get overly complicated and will need to involve LL/LR parser which can prioritize choice and handle syntax ambiguity \cite{parsing-problems}. As the team of LLVM states \cite{clang-parsing}, the main goal was to make a "C Language Family Front-end", which will be easily understood by everyone who has basic knowledge in compilers and working knowledge in any of the C family languages. That is why the LLVM parser which is a recursive descent parser should behave much faster. \textit{Recursive descent is a top-down parsing technique that constructs the parse tree from the top and the input is read from left to right.} So in theory the checker is written from top to down (basically checking parents when it's children. But this is only one of the stats which have to be checked for the best checker. Overall these are the categories that will be checked for every implementation:
+
+\begin{itemize}
+    \item Test Compliance - supports the functionality, and prevents False-Positive results.
+    \item Readability - supports other developers, especially important in large projects such as LLVM
+    \item Performance - supports usefulness, the faster the tool the better integration into IDE's and other tools
+\end{itemize}
+
+\subsection{Requirements}
+From the functionality point of view, the checker should handle the following statements from falling into the unexpected behavior field.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.2\textwidth}|m{0.5\textwidth}|}
+        \hline
+        \textbf{Operator} & \textbf{Context}  \\ 
+        \hline
+        if & Controlling expression \\ 
+        \hline
+        while & Controlling expression \\ 
+        \hline
+        do ... while & Controlling expression \\ 
+        \hline
+        for & Second operand \\ 
+        \hline
+        ?: & First operand \\ 
+        \hline
+        ?: & Second or third operands, where the ternary expression is used in any of these contexts \\ 
+        \hline
+        || & Either operand \\ 
+        \hline
+        \&\& & Either operand \\ 
+        \hline
+        , & Second operand, when the comma expression is used in any of these contexts \\ 
+        \hline
+    \end{tabular}
+    \caption{Checker requirements}
+    \label{tab:checker-req}
+\end{table}
+
+
+\subsection{Exceptions}
+The exceptions play a crucial part in the checker, since they rationalize the rule, and give hacks on how to avoid rule violation. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+# Assignment can be used where the result of the assignment is itself an operand to a comparison expression or relational expression. In this compliant example, the expression x = y  is itself an operand to a comparison operation:
+if ((x = y) != 0) { /* ... */ }
+\end{minted}
+\caption{EXP45-C-EX1}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+# Assignment can be used where the expression consists of a single primary expression. The following code is compliant because the expression  x = y is a single primary expression:
+if ((x = y)) { /* ... */ }
+\end{minted}
+\caption{EXP45-C-EX2}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+# The following controlling expression is noncompliant because && is not a comparison or relational operator and the entire expression is not primary:
+if ((v = w) && flag) { /* ... */ }
+\end{minted}
+\caption{EXP45-C-Noncompliant-AND-OR}
+\end{listing}
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+# EXP45-C-EX3: Assignment can be used in a function argument or array index. In this compliant solution, the expression x = y is used in a function argument:
+if (foo(x = y)) { /* ... */ }
+\end{minted}
+\caption{EXP45-C-EX3}
+\end{listing}
+
+
+\subsection{Top-down approach}
+
+\subsubsection{Selection statements}
+\begin{listing}[H]
+\begin{minted}{cpp}
+Finder->addMatcher(
+    anyOf(whileStmt(HasConditionMatcher), ifStmt(HasConditionMatcher),
+                 doStmt(HasConditionMatcher), forStmt(HasConditionMatcher)
+    )
+    ,
+    this
+);
+\end{minted}
+\caption{Selection statements Matcher}
+\end{listing}
+
+If, we will think about the \textbf{Top-down}(or TD later) approach, which is easier to implement from requirements, then obviously the first step we need to implement is to add the matchers for the \lstinline{for}, \lstinline{while}, \lstinline{do...while} (later referred as selection statements), and \lstinline{if} statements. 
+
+Two things should be noted here. First, is that because there are multiple statements which are needed to be caught, we can choose to implement a separate matcher for every statement. However, more problems will appear, first that the same chuck of code will be repeated, which in theory could be checked with the same rules and second is that having multiple checkers is considered bad for the checker performance since the AST will be traversed more than one time. The structures like \lstinline{anyOf} provide programmatic power for the checker, without compromising its declarative nature.    
+
+\subsubsection{Assignment}
+\begin{listing}[H]
+\begin{minted}{cpp}
+ast_matchers::internal::Matcher<clang::Stmt>
+assignmentMatcher(bool IgnoreParen = true) {
+  if (!IgnoreParen) {
+    return binaryOperator(hasOperatorName("="), unless(anyOf(hasParent(parenExpr()), hasAncestor(callExpr()))))
+        .bind("assignment");
+  }
+  return binaryOperator(hasOperatorName("="), unless(hasAncestor(callExpr()))).bind("assignment");
+}
+\end{minted}
+\caption{Assignment matcher in top-down}
+\end{listing}
+
+
+Inside those statements, the \lstinline{=} operator should be found, under the conditional part. Also, it is important to keep in mind exceptions, so the assignment operator can not be under function call and can not be tracked down under parenthesis in certain cases (therefore sometimes that part of the code needs to be switched off). A good way to achieve this is to create a separate function inside \lstinline{.cpp} file namespace, where depending on the flag the parenthesis will be spotted or not. We finally also bind the value to a string "assignment", so that in the \lstinline{check} method the location of this particular assignment in the code could be tracked down.  
+
+
+\subsubsection{OR and AND}
+
+Plus, there is one more edge case, when the matcher should commence, between the \lstinline{or} and \lstinline{and} binary operators. One more thing is that C++ has binary operators in two token forms (\lstinline{or} \lstinline{||} for example), good that LLVM Front end takes care about this for us. Lastly, the last edge case will be of the ternary expression, which could be used both inside and outside of selection statements. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+binaryOperator(hasAnyOperatorName("&&", "||"),
+                                forEach(implicitCastExpr(
+                                    hasDescendant(assignmentMatcher()))))
+                 )
+\end{minted}
+\caption{Binary logical operators in top-down}
+\end{listing}
+
+
+We will add this matcher into the list of \lstinline{anyOf}, thus getting:
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+Finder->addMatcher(
+      stmt(anyOf(whileStmt(HasConditionMatcher), ifStmt(HasConditionMatcher),
+                 doStmt(HasConditionMatcher), forStmt(HasConditionMatcher),
+                 binaryOperator(hasAnyOperatorName("&&", "||"),
+                                forEach(implicitCastExpr(
+                                    hasDescendant(assignmentMatcher()))))
+                 )
+        ).bind("assignment-not-allowed-expression"),
+      this);
+\end{minted}
+\caption{Combined matcher of top-down}
+\end{listing}
+
+\subsubsection{Ternary expression}
+
+One thing which remains blank is the implementation of \lstinline{HasConditionMatcher} variable. For this, the last edge case of using assignment inside the ternary operator should be considered. The problem with this expression is that due to being an expression, it can be recursive and it can be used outside of the other selection statements or inside of it. Luckily, after careful analysis of the requirements or from \ref{tab:checker-req} and the logic of compilation with the help of clang-query, the occurrence of two cases can be seen
+\begin{enumerate}
+    \item When the ternary expression is used inside selection statements, verification of only the second and third operands is needed since the first one will be checked automatically by the selection checker
+    \item When the ternary expression is used with an assignment as an expression inside other statements
+\end{enumerate}
+
+There is one more thing, which could be easily forgotten the ternary expression in C/C++ can have two forms: \lstinline{cond \? expr1 : expr2} or \lstinline{cond \?: expr1}. Both of these cases should be considered.
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+ast_matchers::internal::Matcher<clang::Stmt>
+conditionalForEachMatcher(decltype(forEach(stmt())) Stmt) {
+  return stmt(
+      anyOf(binaryConditionalOperator(Stmt), conditionalOperator(Stmt)));
+}
+
+ast_matchers::internal::Matcher<clang::Stmt>
+conditionalHasCondditionMatcher(decltype(hasCondition(stmt())) Stmt) {
+  return stmt(
+      anyOf(binaryConditionalOperator(Stmt), conditionalOperator(Stmt)));
+}
+\end{minted}
+\caption{Functions for both cases in top-down}
+\end{listing}
+
+\subsubsection{Condition matcher}
+
+Moreover, the \lstinline{HasConditionMatcher} should also check every child under itself. This guarantees all of the violations will be detected at the same time, including ones caused by the recursive nature of the ternary expression. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+const auto Conditional = conditionalForEachMatcher(forEach(assignmentMatcher(false)));
+const auto HasConditionMatcher = hasCondition(forEachDescendant(
+  stmt(anyOf(implicitCastExpr( 
+    hasDescendant(assignmentMatcher(false))
+  ), Conditional)))
+);
+\end{minted}
+\caption{\lstinline{Conditional} and \lstinline{HasConditionMatcher} variables for top-down}
+\end{listing}
+
+\subsubsection{Top-down matcher}
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::registerMatchers(MatchFinder *Finder) {
+  const auto Conditional = conditionalForEachMatcher(forEach(assignmentMatcher(false)));
+  const auto HasConditionMatcher = hasCondition(forEachDescendant(
+      stmt(anyOf(implicitCastExpr( 
+        hasDescendant(assignmentMatcher(false))
+      ), Conditional)))
+  );
+  Finder->addMatcher(
+      stmt(anyOf(whileStmt(HasConditionMatcher), ifStmt(HasConditionMatcher),
+                 doStmt(HasConditionMatcher), forStmt(HasConditionMatcher),
+                 conditionalHasCondditionMatcher(HasConditionMatcher),
+                 binaryOperator(hasAnyOperatorName("&&", "||"),
+                                forEach(implicitCastExpr(
+                                    hasDescendant(assignmentMatcher()))))
+                 )
+        ).bind("assignment-not-allowed-expression"),
+      this);
+}
+\end{minted}
+\caption{Top-down content of registerMatchers}
+\end{listing}
+
+
+\subsubsection{Top down check}
+
+The check part needs several things to be taken into consideration. 
+
+\begin{enumerate}
+    \item There can be ambiguous checks for the same assignment call due to the implementation of matchers
+    \item The type of selection statement should be added to the warning output
+    \item The location of the warning should point to the assignment, which caused it
+\end{enumerate}
+
+Therefore, we create a private pimpl implementation of the methods and fields which will be used for this purpose. \textit{The pimpl idiom is a modern C++ technique to hide implementation, minimize coupling, and separate interfaces. More in \href{http://aszt.inf.elte.hu/~gsd/halado_cpp/ch09s03.html}{ELTE PIMPL explanation}}. It will need to have an enum for the type of selection matched, and the llvm::SmallVector for tracking down all assignment locations.     
+
+Finally, the end code result for the check method will look like this:
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::check(
+    const MatchFinder::MatchResult &Result) {
+  const auto *MatchedExpressionAssignment =
+      Result.Nodes.getNodeAs<Stmt>("assignment-not-allowed-expression");
+
+  if (MatchedExpressionAssignment) {
+    const auto OperatorType =
+        Control->getOperatorType(MatchedExpressionAssignment);
+    const auto *Assignment =
+        Result.Nodes.getNodeAs<BinaryOperator>("assignment");
+
+    if (Control->hasWarning(Assignment->getOperatorLoc())) {
+      return;
+    }
+
+    Control->addWarning(Assignment->getOperatorLoc());
+    diag(Assignment->getOperatorLoc(),
+         "assignment is not allowed inside %select{if|while|do "
+         "while|for|ternary condition|and|or|unknown}0 statement")
+        << OperatorType;
+  }
+}
+\end{minted}
+\caption{Top-down content of check method }
+\end{listing}
+
+
+\subsection{Bottom-up approach}
+\subsubsection{Bottom-up matcher}
+For the \textbf{Bottom-up}(BU later) approach the logic will be reversed, first, the assignment statement is found, which will be inside selection conditions according to \ref{tab:checker-req}. Here, it means that whenever the assignment is found, there needs to be a certain ancestor in its AST parents. 
+
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::check(
+    const MatchFinder::MatchResult &Result) {
+  Finder->addMatcher(
+      binaryOperator(hasOperatorName("="), stmt(hasDescendant()))
+          .bind("assignment-not-allowed-expression"),
+      this);
+}
+\end{minted}
+\caption{Bottom-up assignment matcher}
+\end{listing}
+
+To track down all selection statements, we use a similar technique to TD, just here they will not have any child matchers. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+    ...
+// for, if, while, dowhile check
+  const auto Selection =
+      stmt(anyOf(whileStmt(), ifStmt(), doStmt(), forStmt(), TernaryExpr))
+          .bind("stmt");
+    ...
+\end{minted}
+\caption{Selection matchers of bottom-up}
+\end{listing}
+
+Moreover, having two edge case scenarios (being binary operators \lstinline{or} and \lstinline{and}, as well as a ternary expression), they also have to be considered by the matcher. Because the assignment operator will be spotted in any case inside other selection statements, we do not need to consider the edge case of having ternary expression check inside \lstinline{while}, \lstinline{do...while}, \lstinline{if}, and \lstinline{for}, instead only when the ternary expression is used inside other expressions or statements. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+    ...
+// && or || operators check
+  const auto LogicalOperator =
+      binaryOperator(hasAnyOperatorName("&&", "||")).bind("logical-op");
+
+  const auto TernaryExpr = implicitCastExpr(
+      hasParent(stmt(anyOf(binaryConditionalOperator(), conditionalOperator()))
+                    .bind("ternary")));
+    ...
+\end{minted}
+\caption{Ternary and Logical operators in bottom-up}
+\end{listing}
+
+Overall, having all these inputs, the assignment operator should be an operand of \lstinline{and},\lstinline{or} or be inside any selection statement, including a ternary expression. However, only assignments spotted inside the condition, resulting in Boolean should be checked, but so far there can be found lots of false positives when the assignment is inside the body of this statement. To prevent this edge case, we need to examine through \lstinline{clang-query} the AST for the several use cases, to find out that an implicit casting is happening every time inside the conditions of the statements. This information will be used to make the matcher more precise. 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::registerMatchers(MatchFinder *Finder) {
+  // && or || operators check
+  const auto LogicalOperator = binaryOperator(hasAnyOperatorName("&&", "||")).bind("logical-op");
+  const auto TernaryExpr = implicitCastExpr(
+      hasParent(stmt(anyOf(binaryConditionalOperator(), conditionalOperator())).bind("ternary")));
+  // for, if, while, dowhile check
+  const auto Selection =
+      stmt(anyOf(whileStmt(), ifStmt(), doStmt(), forStmt(), TernaryExpr)).bind("stmt");
+  const auto SelectionAsParentCheck =
+      allOf(hasAncestor(implicitCastExpr(hasParent(Selection))), unless(anyOf(hasParent(parenExpr()), hasAncestor(callExpr()))));
+  const auto LogicalOpCheck = hasAncestor(implicitCastExpr(hasParent(LogicalOperator), unless(hasAncestor(callExpr()))));
+  Finder->addMatcher(
+      binaryOperator(hasOperatorName("="), stmt(anyOf(SelectionAsParentCheck,LogicalOpCheck)))
+      .bind("assignment-not-allowed-expression"),
+      this);
+}
+\end{minted}
+\caption{Bottom-up content of registerMatchers}
+\end{listing}
+
+
+\subsubsection{Bottom-up check}
+
+For the check method, almost everything stays the same except that now, an advantage of using the BU approach, is that there is no need to track down if the same assignment operator was triggered by the same check more than one time. Therefore, the \lstinline{SmallVector} of \lstinline{warningLocations} was eliminated from the code. Plus, having a different strategy changed the way of taking statement names slightly (more binds of the specific nodes were made). 
+
+\begin{listing}[H]
+\begin{minted}{cpp}
+void AssignmentsInSelectionCheck::check(
+    const MatchFinder::MatchResult &Result) {
+  const auto *MatchedExpressionAssignment =
+      Result.Nodes.getNodeAs<BinaryOperator>(
+          "assignment-not-allowed-expression");
+  if (MatchedExpressionAssignment) {
+    const auto *MatchedStmt = Result.Nodes.getNodeAs<Stmt>("stmt");
+    const auto *LogicalOp =
+        Result.Nodes.getNodeAs<BinaryOperator>("logical-op");
+    const auto *TernaryOp = Result.Nodes.getNodeAs<Expr>("ternary");
+    const auto OperatorType = getOperatorType(TernaryOp   ? TernaryOp : LogicalOp ?LogicalOp : MatchedStmt);
+    diag(MatchedExpressionAssignment->getOperatorLoc(),
+         "assignment is not allowed inside %select{if|while|do "
+         "while|for|ternary condition|and|or|unknown}0 statement")
+        << OperatorType;
+    return;
+  }
+}
+\end{minted}
+\caption{Bottom-up Content of check method }
+\end{listing}

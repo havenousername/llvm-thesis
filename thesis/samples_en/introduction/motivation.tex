@@ -1,0 +1,37 @@
+\section{Motivation}
+\subsection{Purpose of static analyzer. Importance in C/C++}
+
+From the beginning of the 90-s, when the "new economy" \cite{new-economy} and digital technologies started to rule the world, the companies' profits began to heavily rely on the quality and security of the source code. The growth of online commercial environments and transactions increases the amount of sensitive data which needs to be protected. According to the online statistics \cite{cybercrimes-statistics} global cyber attacks have increased by 28\% in the third quarter of 2022 compared to the same period in 2021. According to the 2014 \cite{cybercrimes-ponemon-2014} report from the Ponemon Institute the mean annualized cost of cybercrime for 257 benchmark-ed organizations was \$7.6 million per year, with an average of 31 days to contain a cyberattack. If we look at the process in motion and will analyze the 2017 version of similar research, conducted by the same institution \cite{cybercrimes-ponemon-2017}, the numbers will be even higher: \$11.7 million per year. However, there are some positive tendencies as well, like handling web-based attacks have decreased to 22.4 days (compared to 25.3 days in 2016). All of this raises a concern for developers and entrepreneurs regarding the ways to safeguard services and applications from cybercrimes and possible code vulnerabilities. 
+
+Thus, it is imperative to account for the security when the software is being developed, and the sooner it is found, the better and cheaper fix will be. There are lots of recommendations and methods which can help programmers to detect these issues. One of these vulnerabilities and bugs finding techniques is called static analysis. Static analysis is the method when a computer program is debugged though examining the source code, without executing the program itself. Other types of checking the code require much more time for finding vulnerabilities. For example, dynamic security analysis uses the approach of black box testing and needs the program to be compiled and executed. And though it is useful for some specific scenarios, for the white box testing it is recommended to use static analyzer tools and their components. 
+
+There is a different significance of testing vulnerabilities for different programming languages. Because there are fewer abstractions in low-level languages, programmers are more versatile and have more memory management control when implementing some performance-dependent tasks (like rendering 3D images). This, however, means that code itself is less secure. The two most used low-level programming languages are C/C++, both of which can run into various problems by giving too much control to the developer. There are underflow/overflow errors, out-of-box overrides, and usage after free. Most of these issues give a so-called "undefined" behavior of the program. Generally, we speak about undefined behavior, in cases when the execution of the program is not predictable. Depending on various factors, this might result in occasionally failing compilation, incorrect results, or environment-dependent results.
+
+\begin{figure}[H]
+	\centering
+        \caption{Language popularity by the lines of code by \cite{lang-popularity}}
+	\includegraphics[width=0.9\textwidth,height=170px]{images/stats/lines-of-code-pop.jpeg}
+	\label{fig:language-line-of-code}
+\end{figure}
+
+
+Another reason why having static analysis is so important in languages like C/C++ is due to their level of integration into modern computer systems and their usage in the CS world. According to figure \ref{fig:language-line-of-code}, C and C++ are the most used languages if we take lines of code written in them as a benchmarking. 
+
+\begin{figure}[H]
+	\centering
+        \caption{Language popularity by usage among developers by \cite{lang-pop-devs} }
+	\includegraphics[width=0.5\textwidth,height=310px]{images/stats/most-used.png}
+	\label{fig:languages-top-10}
+\end{figure}
+
+Other statistical resources like image \ref{fig:languages-top-10} provide the same results, being that C/C++ languages are always in the 10 top most used languages. This can be explained by the biggest codebases and legacy code. All big companies use C++ to some extent (for example Google V8, almost all software like Windows OS from Microsoft, open source: Linux Kernel). Most of this software are being developed since the last century (Microsoft Windows), having a lot of legacy code, which needs to be improved and refactored. 
+
+This marks the importance of having a mature static analysis tool in such languages as C/C++. Being close to the hardware can benefit the programmer with lots of freedom, but at the same time making the security of code far from ideal. C++ has the biggest codebase in the history \cite{study-large-projects}, it is used under the hood of the biggest project in the history of humanity, as consequence having the best ground for the errors and bugs \cite{most-secure-pl} to appear in the final product. Also, a lot of times high-level programming languages are translated into C, as one of the first steps of their compilation, making the significance of C even bigger in the programming community. 
+
+\subsection{LLVM. Advantages and disadvantages. Clang-tidy }
+
+One of the most developed and flexible solutions for C/C++ static analysis and its extension can be found in LLVM. Developed originally in 2003, LLVM (standing initially for the "Low-Level Virtual Machine", but most current developers think of it as a virtual machine \cite{wiki-llvm}). According to the official website, The LLVM Project is a collection of modular and reusable compiler and toolchain technologies. Among many useful tools which could be found in this project ones which will be used in this thesis paper will be clang-tidy (clang-based modular C++ "linter"), and clang-query (command line tool for creating fast AST matchers). 
+
+Being the part of LLVM family clang-tidy can be easily integrated with other LLVM tools, but can also be freely used apart from it as an isolated entity. There are C/C++ static analysis tools like "Astree", and "CodeSonar" which are not open-source, contrary to Clang. However, other analogs are open-source for instance "Frama-C" or "Cpp-Check". Nevertheless, according to the results of the research \cite{comparison-sat}, which compared most of the available open-source C++ tools, clang got most of the points in the overall score for each defect subtype, even though having some false-positive percentage rates as well. In the summary of the article, the authors conclude that there is no ideal solution at the moment; most of the tools are hard to install and compile (in contrast with clang), in some cases even providing some defects in the end. This is one of the reasons why clang-tidy was chosen as the focus of this thesis work. With the right amount of time and resources, clang-tidy solution can give true-positive results for the many edge cases which can exist in the C/C++ languages.
+
+

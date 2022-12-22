@@ -1,0 +1,147 @@
+\section{clang-tidy architecture}
+
+The main use cases of clang-tidy are:
+
+\begin{enumerate}
+    \item Detection of bug-prone coding patterns
+    \item Enforcement of coding conventions
+    \item Creation of modern and maintainable code
+    \item Easy custom-check extension
+\end{enumerate}
+
+\begin{listing}[!b]
+\begin{minted}{bash}
+clang-tidy/                       # Clang-tidy core.
+  |-- ClangTidy.h                   # Interfaces for users.
+  |-- ClangTidyCheck.h              # Interfaces for checks.
+  |-- ClangTidyModule.h             # Interface for clang-tidy modules.
+  |-- ClangTidyModuleRegistry.h     # Interface for registering of modules.
+     ...
+  |-- google/                       # Google clang-tidy module.
+  |-+
+    |-- GoogleTidyModule.cpp
+    |-- GoogleTidyModule.h
+          ...
+  |-- llvm/                         # LLVM clang-tidy module.
+  |-+
+    |-- LLVMTidyModule.cpp
+    |-- LLVMTidyModule.h
+          ...
+  |-- objc/                         # Objective-C clang-tidy module.
+  |-+
+    |-- ObjCTidyModule.cpp
+    |-- ObjCTidyModule.h
+          ...
+  |-- tool/                         # Sources of the clang-tidy binary.
+          ...
+  test/clang-tidy/                  # Integration tests.
+      ...
+  unittests/clang-tidy/             # Unit tests.
+  |-- ClangTidyTest.h
+  |-- GoogleModuleTest.cpp
+  |-- LLVMModuleTest.cpp
+  |-- ObjCModuleTest.cpp
+      ...
+\end{minted}
+\caption{Structure of the clang-tidy directory}
+\label{code:dir-str}
+\end{listing}
+
+\subsection{Code structure of clang-tidy module}
+
+Being a part of LLVM infrastructure clang-tidy uses its Clang compiler for getting the required information about the semantic structure of the analyzed code. To maintain such a big codebase as LLVM, its creators developed a solid structure of the source code which needs to be applied by every contributor to the project. Code snippet \ref{code:dir-str} shows the directory structure of clang-tidy, where from the root you can access interfaces, and other directories each representing its ruleset. As our checker is called "CERT EXP45-C" it will be placed under the \lstinline{cert} directory, according to conversions. 
+
+
+Thus the rules created by the compilation of clang-tidy could be grouped easily as well, giving the flexibility to switch them on and off without struggle, or even to create your configuration.  
+
+\begin{enumerate}
+    \item \textit{boost-*} - Checks related to Boost( a set of libraries for the C++ supporting linear algebra, pseudorandom number generation, multithreading, etc.) library
+    \item \textit{cert-*} - Checks related to CERT(subsection \ref{section:cert}) Secure Coding Guidelines.
+    \item \textit{cppcoreguidelines-*} - Checks related to C++ Core Guidelines.
+    \item \textit{clang-analyzer-*} - Clang Static Analyzer checks.
+    \item \textit{google-*} - Checks related to the Google coding conventions.
+    \item \textit{llvm-*} - Checks related to the LLVM coding conventions.
+    \item \textit{misc-*} - Checks that we didn’t have a better category for.
+    \item \textit{modernize-*} - Checks that advocate usage of modern language constructs.
+    \item \textit{mpi-*}: Checks related to MPI (Message Passing Interface).
+    \item \textit{performance-*} - Checks that target performance-related issues.
+    \item \textit{readability-*} - Checks that target readability-related issues that don’t relate
+    to any particular coding style.
+    \item etc...
+\end{enumerate}
+
+
+\subsection{Understanding Clang AST}
+
+An Abstract Syntax Tree is a tree representation of the abstract syntax structure of the program that conveys the structure of the source code. AST represents how the code is structured in a meaningful way, giving context and syntax-related information about its nodes \cite{ast-definition}. To give some background on AST, it will be defiantly to analyze how the basic compiler works and how it is related to AST generation. There are three main steps in the compilation of the program which result in creating an intermediate code representation(IR). These steps are usually referred to as the front end of the compiler. 
+
+The lexical analysis phase or scanner reads the characters from the source code and transforms them into lexical tokens, correlated logically between each other. Syntax analysis uses the output of the lexer to create groups of tokens called syntactical entities, such as expressions, statements, etc. The output of this phase is usually a parse tree or abstract syntax tree. In AST the roots of the subtrees represent non-terminal symbols of the grammar, while the leaves represent terminal symbols of the grammar \cite{ast-nasa}. 
+
+In the more recent compilers, like LLVM, AST can also contain important information about the code and its attributes. As LLVM documentation states \cite{llvm-ast}, Clang AST closely resembles both the written C++ code and the C++ standard. For example, parenthesis expressions and compile time constants are available in an unreduced form in the AST. Moreover, every node of AST is represented through a specific instance of a C++ AST class. These AST classes have a close relation, inheriting one from each other, deriving from the from \lstinline{Type}, \lstinline{Decl}, \lstinline{DeclContext} or \lstinline{Stmt}. However, there is no common ancestor of the nodes in the Clang AST by design, so for traversing the full AST \lstinline{TranslationUnitDecl} class instance should be used. Thus, the most basic nodes are statements and declarations, with expressions being derived from statements. 
+
+After learning the theory behind Clang AST, it might be beneficial to show the actual usage of the concept. For this reason, \lstinline{clang-query} will be used with a quick introduction to the tool itself.
+
+\subsubsection{clang-query}
+
+\lstinline{clang-query} is a tool that allows one to quickly develop, debug and iterate over the complex part of the matcher \cite{mozilla-clang-query}. To use clang-query you can either download the executable (you can check how to install it as a package \href{https://command-not-found.com/clang-query}{here}). Otherwise, you can use it from the LLVM project directory (like \lstinline{ABSOLUTE_PATH_TO_YOUR_LLVM_BUILD/Build/bin/clang-query}, which will be referred to later as just \lstinline{clang-query}). \lstinline{clang-query}  requires C/C++ to run on. Let's give an example C file code which will be added as a parameter (if you are stuck use \lstinline{clang-query --help} command in your terminal). 
+
+\begin{listing}[h]
+\begin{minted}{c}
+#define AREA(l, b) (l * b)
+
+int main() {
+    int x, y, b;
+    AREA(x = b, y);
+    return 0;
+}
+\end{minted}
+\caption{Example C program}
+\label{code:c-example}
+\end{listing}
+
+
+Now, let us run clang-query with this file \lstinline{clang-query main.c} (run \lstinline{cd directoru-with-your-file} if you are in a wrong directory). The following terminal environment should appear:
+
+\begin{figure}[H]
+	\centering
+        \caption{ Clang-Query }
+	\includegraphics[width=1\textwidth,height=170px]{images/clang-query/01.png}
+	\label{fig:clang-query-run}
+\end{figure}
+
+It is possible to write some matchers using AST, but before that, let's set up the environment in the most suitable configuration. 
+
+\begin{listing}[h]
+\begin{minted}{cpp}
+> set bind-root true
+// true, unless you want to bind specific parts of the checker (.bind("foo") )
+> set print-matcher true
+// will print a header line of the form "Matcher: <foo>" where foo is the matcher you have written.
+> enable output detailed-ast
+// shows the whole subtree structure of the place where the match was found
+\end{minted}
+\caption{Basic configuration of clang-query tool}
+\label{code:query-config}
+\end{listing}
+
+For a more complex setup, you can address the \href{https://devblogs.microsoft.com/cppblog/exploring-clang-tooling-part-2-examining-the-clang-ast-with-clang-query/}{Microsoft documentation} or just write \lstinline{help} inside \lstinline{clang-query} terminal.
+
+To see the whole AST tree of the program write:
+
+% \lstset{caption={}}
+\begin{listing}[h]
+\begin{minted}{cpp}
+// m stands for the matcher, you can also use match 
+> m translationUnitDecl()
+\end{minted}
+\caption{Match whole available AST}
+\label{code:query-tr-unit-decl}
+\end{listing}
+
+
+\begin{figure}[H]
+	\centering
+        \caption{ AST Tree of \lstinline{main.c} }
+	\includegraphics[width=1\textwidth,height=350px]{images/clang-query/02.png}
+	\label{fig:clang-query-tr-ast}
+\end{figure}

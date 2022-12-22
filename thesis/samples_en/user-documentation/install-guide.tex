@@ -1,0 +1,250 @@
+\section{Installation and Usage}
+
+Depending on your needs your can either install the whole LLVM project or just clang-tidy. In the case of installing the whole project, the best way will be to create binaries by yourself as it is recommended by the LLVM documentation. 
+
+\subsection{Install LLVM project (optional)}
+
+There is no need in installing a complete LLVM project to use clang-tidy. As it is a standalone tool, there are a lot of ways described below how it can be used by itself or integrated into other tools like "CodeChecker". However, in some examples, there will be used clang-tidy version built from the LLVM project, so it is still advised not to skip this part of the installation. 
+
+\subsubsection{System requirements}
+
+The table it is shown the system requirements to install LLVM. Checkers were developed on Linux Mint 20.1 (Kernel version: 5.4.0-58-generic).
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{ | m{0.25\textwidth} | m{0.25\textwidth} | m{0.25\textwidth} |}
+            \hline
+		\textbf{Operating System} & \textbf{Processor Architecture} & \textbf{Compiler}   \\ 
+		  \hline
+		Linux & x861 & gcc, clang\\
+		\hline
+		Linux & amd64 & gcc, clang\\
+		\hline
+		Linux & arm & gcc, clang\\
+		\hline
+		Linux & Mips & gcc, clang\\
+		\hline
+		Linux & PowerPC & gcc, clang\\
+		\hline
+		Solaris & V9 & gcc\\
+		\hline
+		FreeBSD & x861 & gcc, clang\\
+		\hline
+		FreeBSD & amd64 & gcc, clang\\
+		\hline
+		NetBSD & x861 & gcc, clang\\
+		\hline
+		NetBSD & amd64 & gcc, clang\\
+		\hline
+		macOS2 & PowerPC & gcc\\
+		\hline
+		macOS & x86 & gcc, clang\\
+		\hline
+		Cygwin & x86 & gcc\\
+		\hline
+		Windows & x86 & Visual Studio\\
+		\hline
+		Windows64 & x86-64 & Visual Studio\\
+		\hline
+	\end{tabular}
+	\caption{LLVM system requirements}
+	\label{tab:sys-req}
+\end{table}
+
+
+\subsubsection{Prerequisites}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|m{0.2\textwidth}|m{0.2\textwidth}| m{0.2\textwidth}|}
+        \hline
+        \textbf{Package} & \textbf{Version} & \textbf{Notes} \\ 
+        \hline
+        \href{https://cmake.org/}{CMake} & >=3.13.4	& Workspace generator \\ 
+        \hline
+        \href{https://gcc.gnu.org/}{GCC} & >=7.1.0 & C/C++ compiler \\ 
+        \hline
+        \href{https://python.com}{python} & >=3.6 & Runs ".py" commands from source  \\ 
+        \hline
+        \href{http://savannah.gnu.org/projects/make}{GNU Make} & 3.79, 3.79.1 & Makefile build processor \\ 
+        \hline
+    \end{tabular}
+    \caption{System Prerequisites}
+    \label{tab:prerequisites}
+\end{table}
+
+
+\subsubsection{Building LLVM from the source}
+
+\begin{listing}[H]
+\begin{minted}{bash}
+$ # on Windows --config core.autocrlf=false flag need to be added to the git clone command.
+$ git clone https://github.com/llvm/llvm-project.git
+$ # Cloning into 'llvm-project'...
+$ # remote: Enumerating objects: 5166681, done.
+$ # remote: Counting objects: 100% (2333/2333), done.
+$ # remote: Compressing objects: 100% (333/333), done.
+$ # Receiving objects:   0% (8261/5166681), 2.82 MiB | 195.00 KiB/s
+$ cd llvm-project
+$ mkdir build 
+$ cd build
+$ # Configure build using cmake
+$ cmake \
+$ -G "Ninja" \ -DLLVM_ENABLE_PROJECTS="llvm;clang;clang-tools-extra" \  DCMAKE_BUILD_TYPE=Release \
+-DBUILD_SHARED_LIBS=ON \
+-DLLVM_TARGETS_TO_BUILD=X86 \ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+../llvm/
+$ # -j 4 number of parallel jobs done by the ninja. Even with all 4 cores used it might take a while
+$ ninja -j 4
+\end{minted}
+\caption{Build LLVM}
+\label{code:build-llvm-usr}
+\end{listing}
+
+Unfortunately, as of now, the version of clang-tidy with EXP-45 checker is not yet uploaded to the release version of LLVM. Therefore if you have \href{https://mainstream.inf.elte.hu/}{ELTE Gitlab Mainstream account} you can use the following commands: 
+\begin{listing}[H]
+\begin{minted}{bash}
+$ # on Windows --config core.autocrlf=false flag need to be added to the git clone command.
+$ git clone --recurse-submodules https://github.com/havenousername/llvm-thesis
+$ # Cloning into 'llvm-thesis'...
+$ # remote: Enumerating objects: 5166681, done.
+$ # remote: Counting objects: 100% (2333/2333), done.
+$ # remote: Compressing objects: 100% (333/333), done.
+$ # Receiving objects:   0% (8261/5166681), 2.82 MiB | 195.00 KiB/s
+$ cd llvm-thesis/llvm-projecct
+$ # Same steps as for the release version
+\end{minted}
+\caption{Build LLVM with CERT EXP-45 checker}
+\label{code:build-llvm-exp45-usr}
+\end{listing}
+
+
+\subsection{Install clang-tidy}
+
+\paragraph{Package installation on Linux(or WSL)/Mac OS\\}
+
+\begin{enumerate}
+    \item For Ubuntu/Debian distributions: 
+        \begin{listing}[h]
+        \begin{minted}{bash}
+            $ sudo apt-get update -y
+            $ sudo apt-get install -y clang-tidy
+        \end{minted}
+        \caption{Install from bash on Ubuntu/Debian}
+        \label{code:install-debian}
+        \end{listing}
+    \item For Fedora/Centos distributions: 
+        \begin{listing}[h]
+        \begin{minted}{bash}
+            $ dnf install clang-tools-extra
+        \end{minted}
+        \caption{Install from bash on Fedora/Centos}
+        \label{code:install-fedora}
+        \end{listing}
+    \item For Mac OS:
+        \begin{listing}[h]
+        \begin{minted}{bash}
+            $ brew install llvm
+            $ ln -s "$(brew --prefix llvm)/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+        \end{minted}
+        \caption{Install from bash on Mac OS}
+        \label{code:install-fedora}
+        \end{listing}
+\end{enumerate}
+
+\subsection{Clang-tidy usage}
+
+To demonstrate how clang-tidy works, we will use main.c file with the following code:
+
+\begin{listing}[h]
+\begin{minted}{c}
+#include <stdio.h>
+
+int main() {
+  printf("Here is print\n");
+  // Here clang-tidy should create two warnings
+  int x, y = 0;
+  // Here as well
+  if (x = y) {
+    printf("%d", x);
+  }
+}
+\end{minted}
+\caption{Sample C program for clang-tidy diagnostics}
+\label{code:sample-c-usr}
+\end{listing}
+
+
+The simplest way to run clang-tidy is to call it directly (if you have installed it from the package manager, if not, add an alias to ".bash\_rc"), with the \lstinline{checks=*,*} . 
+
+\begin{listing}[h]
+\begin{minted}{bash}
+$ # simple usage is following:
+$ # clang-tidy path/to/file -checks=*,*
+$ clang-tidy main.c -checks=-*,*
+\end{minted}
+\caption{Run clang-tidy with all checks}
+\label{code:run-checks-all}
+\end{listing}
+
+This command should result in the following output: 
+
+\begin{figure}[H]
+    \centering
+    \caption{Output of \lstinline{clang-tidy path/to/file -checks=*,*}}
+    \includegraphics[width=0.8\textwidth,height=200px]{images/tidy-usage/01.png}
+    \label{fig:clang-tidy-usage-01}
+\end{figure}
+
+For checking the assignment-in-selection checker (or any other specific checker/checkers), the argument of the \lstinline{checks} checks should be modified the in following way: \lstinline{-checks=*,checker01,checker02}. \lstinline{-checks} accepts a certain type of Regular Expression (the string before the comma defines which checkers will be ignored by clang-tidy, everything after it will define the rules for accepted checkers) as in figure \ref{fig:clang-tidy-usage-02}.
+
+\begin{figure}[H]
+    \centering
+    \caption{Output of \lstinline{clang-tidy path/to/file -checks=*,cert-assignments-in-selection}}
+    \includegraphics[width=0.8\textwidth,height=150px]{images/tidy-usage/02.png}
+    \label{fig:clang-tidy-usage-02}
+\end{figure}
+
+\paragraph{Create a text file from clang-tidy warning \\}
+
+It is possible to send clang-tidy to the text output instead of the terminal. Prerequisites for Linux is \lstinline{tee} library. Here is an example of how it can be done:
+\begin{listing}[h]
+\begin{minted}{bash}
+$ Build/bin/clang-tidy -header-filter=-* Build/main.cpp  -checks=-*,cert-assignments-in-selection,bugprone-* | tee out.log
+\end{minted}
+\caption{Output warnings to the text file}
+\label{code:out-text}
+\end{listing}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth,height=150px]{images/tidy-usage/text-log.png}
+    \label{fig:clang-tidy-usage-03}
+    \caption{Text logs}
+\end{figure}
+
+\paragraph{Create an HTML file from warnings}
+
+\href{https://github.com/austinbhale/clang-tidy-html}{clang-tidy-html} library is the perfect tool for creating HTML representation of the clang-tidy warnings. 
+
+\begin{listing}[h]
+\begin{minted}{bash}
+$ # Prerequisites: python3 (https://www.python.org/)
+$ pip3 install clang-html
+$ # if you did not create .log file use this command: Build/bin/clang-tidy -header-filter=-* Build/main.cpp  -checks=-*,cert-assignments-in-selection,bugprone-* | tee out.log
+$ pip3 install clang-html
+$ python -m clang_html out.log -o index.html
+\end{minted}
+\caption{Install and use clang-html}
+\label{code:out-html}
+\end{listing}
+
+
+\begin{figure}[H]
+    \centering
+    \caption{Text logs}
+    \includegraphics[width=1\textwidth,height=150px]{images/tidy-usage/html-log.png}
+    \label{fig:clang-tidy-usage-04}
+\end{figure}
+
+There are many other options for how clang-tidy could be used and configured. You can address official \href{https://clang.llvm.org/extra/clang-tidy/index.html}{documentation} for a more detailed explanation of those.

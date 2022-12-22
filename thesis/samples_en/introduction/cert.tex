@@ -1,0 +1,135 @@
+\section{SEI CERT C++ Coding Standard}
+
+\subsection{CERT}
+\label{section:cert}
+
+Most of the rules for the software systems are combined into coding standards. These rules give recommendations for programmers for better code safety, readability, etc. Sometimes these standards can be different for two companies using the same stack (for example in the LLVM project the convention of writing variable names says that they should be done in Pascal case). This is why it is really important to try to use the same standards and to combine as many of them as possible. For example, clang-tidy has a whole directory of rules created by Google which complies with their coding standards but also gives other companies and developers a solid recommendation. One such documented standard is the CERT Coding Standard, which is developed by the CERT Coordination Center to improve the safety, reliability, and security of the software systems \cite{sei-cert} \cite{wiki-cert}. The SEI CERT Rule which will be analyzed in this thesis is Cert EXP45-C  (Do not implement assignments inside selection statements) \cite{cert-45}. Several solutions will be given to solve this issue, alongside their performance, usage, and testing comparison. 
+
+\subsection{EXP45-C}
+\label{section:exp45-c}
+
+Some of the practices which could be done in C/C++ can be really hard to understand and also get an expected result. This might cause a lot of problems with the security of the program and project itself.
+
+One of the biggest concerns with writing C++ code is undefined and unexpected behavior. And while undefined behavior is more known for the general audience and it is considered as dangerous and maybe even more dangerous than undefined behavior, according to the CERT website \cite{cert-unexpected}, unexpected behavior is a well-defined behavior that may be unexpected or unanticipated by the programmer; incorrect programming assumptions. Therefore, here rises the biggest difference from the undefined one, in latter the computer does not provide an deterministic solution, while in the unexpected one programmer does not get a certain solution, which he intended to program.
+
+As Arno Lepisk states in his presentation \cite{ppt-unexpected}, there are three types of unexpected behavior: 
+ \setlist{nolistsep}
+ \begin{enumerate}[noitemsep]
+  \item Odd
+  \item Murphy
+  \item Machiavelli
+\end{enumerate}
+
+Of course, these are just conventional terms, but they speak a lot about what to expect from the C/C++ unexpected issues. 
+
+\subsubsection{Odd unexpected behavior}
+The first category occurs mostly when the syntax and usage of this syntax can mislead or confuse other programmers. As an example, we can take a look into the alternative operators, which exist in C++ mostly for broader compatibility reasons.
+
+\begin{listing}[h]
+\begin{minted}{c}
+    ... 
+    int i;
+    int *ptr = &i;
+    int *ptr = bitand i;
+\end{minted}
+\label{code:odd-bit-and-op}
+\caption{Alternative Bit-wise "And" operator}
+\end{listing}
+
+
+\subsubsection{Murphy unexpected behavior}
+The second category is mostly what we will be mostly related to the topic of this thesis and the CERT EXP-45 rule specifically. It collects all the behavior of the program, when the programmer, due to the lack of knowledge, or by just being inaccurate, can produce slightly, or completely different results. In the worst-case scenario, such behavior will lead to a security vulnerability in the code, which can be used to create malware or even hack the whole system. Most of them are caused by the C/C++ nature of being weakly typed languages and having implicit casting out of the box. A good recent example might be a PlayStation 4/5 Jailbreak vulnerability \cite{ps-vulnarability}. Here is an example of what happened:
+
+\begin{listing}[h]
+\begin{minted}{c}
+    ...
+    void *sceFatfsCreateHeapVl(void *unused, int size) {
+        return malloc(size, M_EXFATFSPATH, M_WAITOK | M_ZERO);
+    }
+
+    ... 
+    size_t dataLength = *(size_t *)(upcaseEntry + 24);
+    size_t size = sectorSize + dataLength - 1;
+    size = size - size % sectorSize;
+    uint8_t *data = sceFatfsCreateHeapVl(0, size);
+\end{minted}
+\caption{size\_t-to-int vulnerability in exFAT leads to memory corruption}
+\label{code:murphy-ps5}
+\end{listing}
+
+The root cause of this vulnerability is in the usage of  \lstinline{sceFatfsCreateHeapVl} function which makes an implicit conversion into an int (32bits) from size\_t (64bits). The result of this tiny issue is big security leak, which allows to Jailbreak the device by plugging the USB, and direct kernel code execution. 
+
+\subsubsection{Machiavellian unexpected behavior}
+The last category is the one that is the hardest to find because in this situation the programmer is directly responsible for making it, consciously making code unreadable and not extensible. C/C++ being the language that gives a lot of creative freedom to its developers is a perfect playground for such "Machiavellian" people. There is a whole contest on the \href{https://www.ioccc.org/}{IOCC website} which has shown the importance of good programming style and testing phases as one of its main priorities. Here is a great example from their forum:  
+
+\begin{listing}[h]
+\begin{minted}{c}
+    ...
+    int main(int b,char**i){long long n=B,a=I^n,r=(a/b&a)>>4,y=atoi(*++i),_=(((a^n/b)*(y>>T)
+    |y>>S)&r)|(a^r);printf("%.8s\n",(char*)&_);}
+    ...
+\end{minted}
+\caption{IOCCC Best One liner}
+\label{code:mach-one-liner}
+\end{listing}
+
+Even though this code compiles and works correctly, it is still really confusing and obscure. Debugging something like this can feel like a nightmare for the other developer. C++ on the other hand, adds new features above C, such as operator overloading, which can become even more confusing in the wrong hands. 
+
+
+\subsubsection{Do not perform assignments in selection statements}
+
+After deep dive into the nature of the unexpected behavior types, it will be much easier to understand the EXP45-C issue that will be analyzed in this paperwork. CERT documentation makes it easier to understand the overall context of this rule. Mainly, it is focused on the assignment (denoted as \lstinline{=} in C/C++) operator and its usage inside selection statements. Selection statements are the ones where the result, or as one of the results of the code execution will be a Boolean condition. This condition has great significance for the future of the control flow of the program. This is why it is imperative to have these control flow conditions as clear, precise, and logically correct as it is possible. But keeping the specificity of the issue, in our case, it is crucial to keep assignment statements inside these conditions intended.
+
+There are several reasons for that, most of which are described above. The most obvious of them is that the developer simply made a mistake, and instead of using the  \lstinline{==} (equality) operator used \lstinline{=} (assignment). The most trivial case is already very well known, and its warning is part of Standard Clang Warnings (-Wparentheses ), and even GCC compiler(when the -Wall flag is used). Here is an example:
+
+\begin{listing}[h]
+\begin{minted}{c}
+    ...
+    int mystrcpy(char *a, char *b) { 
+        char *c = b; 
+        while (*a++=*b++) ; 
+        return b-c; 
+    } 
+    ... 
+\end{minted}
+\caption{-Wparentheses checker violation code}
+\label{code:-wparen-viol}
+\end{listing}
+
+\paragraph{\\ 
+\\}
+This code snippet has a lot of problems and can give a lot of edge cases in the execution phase (you can read more about it from here: \url{https://qr.ae/pr8pZP}). However, there are other scenarios when the simple -Wparentheses does not detect a violation. Let us take a look into this \ref{code:-wparen-not-viol} example.
+
+\begin{listing}[!h]
+\begin{minted}{c}
+    int main() {
+        char v = 97;
+        char w = 0;
+        int flag = 1;
+    
+        printf("Put the character 'a'\n");
+        scanf("%c", &w);
+    
+        while ((v = w) && flag) {
+            printf("I want an infinite loop \n");
+            sleep(1);
+        }
+    
+        printf("The infinite loop is not infinite :(\n");
+    }
+\end{minted}
+\caption{-Wparentheses checker does not detect violation}
+\label{code:-wparen-not-viol}
+\end{listing}
+
+Even though at first glance this code should run as expected (when you input \lstinline{a} it goes into an infinite loop, otherwise the program is ended), in reality, it will always go into an infinite loop, no matter the input. Moreover, if we delete lines 6 to 8, the result will be that, surprisingly, the code will not go into the infinite loop, but continue its execution after a while. This is happening since, in the end, the \lstinline{v} variable will be equal to 0, which will be implicitly cast to "false" leading to a partially unexpected result (if the \lstinline{w} variable is initialized in another file for example). 
+
+
+There are certain recommendations, on how to avoid this unexpected workflow problem:
+ \setlist{nolistsep}
+ \begin{enumerate}[noitemsep]
+  \item Do not perform assignment inside selection statements, if you need one, make it inside the context itself (body of the for loop for example), or before the selection has occurred. This way the code will become much more secure and readable 
+  \item If you have an urge for this rule violation, make it explicit so that the checker and other people understand your intention
+\end{enumerate}
+
+
