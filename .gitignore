@@ -1,6 +1,8 @@
 Build
-test-apps
+test-*
 .tmp
 .cache
 compile_commands.json
 env
+*.db
+images
